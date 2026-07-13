@@ -1,3 +1,7 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = { output: "standalone", outputFileTracingRoot: import.meta.dirname };
+const nextConfig = {
+  outputFileTracingRoot: import.meta.dirname,
+  ...(process.env.VERCEL === "1" ? {} : { output: "standalone" }),
+};
+
 export default nextConfig;

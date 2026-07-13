@@ -181,12 +181,19 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api npm run dev
 
 ## Развёртывание через Vercel Services
 
-Корневой `vercel.json` описывает два сервиса: Next.js из `frontend/` и FastAPI из `backend/`. Публичные запросы `/api/*` направляются в backend, остальные маршруты — во frontend. Поэтому в Vercel `NEXT_PUBLIC_API_URL` можно не задавать или установить равным `/api`.
+Корневой `vercel.json` описывает два явно типизированных сервиса: Next.js из `frontend/` и FastAPI из `backend/`. Публичные запросы `/api/*` направляются в backend, остальные маршруты — во frontend. Vercel использует стандартный результат Next.js, а локальная и Docker-сборки сохраняют `standalone`-режим. Поэтому в Vercel `NEXT_PUBLIC_API_URL` можно не задавать или установить равным `/api`.
 
-В настройках проекта Vercel необходимы:
+В панели Vercel для проекта должны быть выбраны корень репозитория и Framework Preset `Services`. Поля Build Command, Install Command и Output Directory следует оставить без ручных значений: каждый сервис определяет сборку относительно собственного `root` из `vercel.json`.
+
+Обязательная переменная production-окружения:
 
 ```text
 DATABASE_URL=postgresql://<пользователь>:<пароль>@<хост>/<база>
+```
+
+Адрес API уже имеет безопасное значение по умолчанию. При желании его можно закрепить явно вместе с отключением локальной инициализации базы:
+
+```text
 NEXT_PUBLIC_API_URL=/api
 AUTO_BOOTSTRAP_DATABASE=false
 ```
