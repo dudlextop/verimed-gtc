@@ -8,7 +8,7 @@
 
 ```bash
 cd frontend
-npm run build
+NEXT_PUBLIC_API_URL=http://localhost:8000/api npm run build
 npm start
 # во втором терминале
 npm run visual:check

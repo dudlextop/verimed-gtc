@@ -13,9 +13,10 @@ from app.seed import seed_database
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    Base.metadata.create_all(engine)
-    with SessionLocal() as db:
-        seed_database(db)
+    if settings.bootstrap_database_on_start:
+        Base.metadata.create_all(engine)
+        with SessionLocal() as db:
+            seed_database(db)
     yield
 
 

@@ -22,7 +22,7 @@
 - четырёхстраничное альбомное печатное представление `/overview` без интерактивных действий;
 - запрещённая терминология, абсолютные пользовательские пути, секреты и чувствительные данные.
 
-Автоматические проверки: 83 backend-теста и 60 frontend-тестов пройдены; Ruff, mypy strict, ESLint, TypeScript strict и production build завершены без ошибок. Единственное backend-предупреждение относится к будущей замене тестовой интеграции Starlette/httpx.
+Автоматические проверки: 87 backend-тестов и 61 frontend-тест пройдены; Ruff, mypy strict, ESLint, TypeScript strict и production build завершены без ошибок. Единственное backend-предупреждение относится к будущей замене тестовой интеграции Starlette/httpx.
 
 ## 3. Исправленные ошибки
 
@@ -106,6 +106,8 @@ Docker CLI отсутствует (`command not found`), поэтому факт
 - build-time адрес API frontend;
 - standalone-команда Next.js;
 - `.dockerignore` frontend и backend.
+
+Дополнительно подготовлено развёртывание через Vercel Services: frontend и backend описаны в корневом `vercel.json`, same-origin запросы используют `/api`, а Vercel-сервис требует внешнюю PostgreSQL-базу и не запускает миграции или заполнение при старте приложения.
 
 ## 8. Конфиденциальность
 

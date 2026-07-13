@@ -179,6 +179,30 @@ npm ci
 NEXT_PUBLIC_API_URL=http://localhost:8000/api npm run dev
 ```
 
+## Развёртывание через Vercel Services
+
+Корневой `vercel.json` описывает два сервиса: Next.js из `frontend/` и FastAPI из `backend/`. Публичные запросы `/api/*` направляются в backend, остальные маршруты — во frontend. Поэтому в Vercel `NEXT_PUBLIC_API_URL` можно не задавать или установить равным `/api`.
+
+В настройках проекта Vercel необходимы:
+
+```text
+DATABASE_URL=postgresql://<пользователь>:<пароль>@<хост>/<база>
+NEXT_PUBLIC_API_URL=/api
+AUTO_BOOTSTRAP_DATABASE=false
+```
+
+`DATABASE_URL` должен указывать на внешнюю постоянную PostgreSQL-базу. Локальная SQLite при запуске в Vercel отклоняется конфигурацией. Стандартные URL `postgres://` и `postgresql://` автоматически используют установленный драйвер psycopg.
+
+Миграции и исходное заполнение выполняются один раз до первого рабочего запуска, а не при обработке запросов:
+
+```bash
+cd backend
+DATABASE_URL='<production-url>' AUTO_BOOTSTRAP_DATABASE=false alembic upgrade head
+DATABASE_URL='<production-url>' AUTO_BOOTSTRAP_DATABASE=false python -m app.seed
+```
+
+После этого приложение запускается без `create_all` и генерации данных в lifespan Vercel-сервиса. Контрольный endpoint доступен по `/api/health`. Для использования Services проекту должен быть предоставлен доступ к этой возможности Vercel.
+
 ## Основные маршруты интерфейса
 
 - `/` — сводная аналитика и командный центр;

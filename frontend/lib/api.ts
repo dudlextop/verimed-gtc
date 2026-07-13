@@ -1,6 +1,6 @@
 import type { AnalysisMetric, AnalysisMetricByType, AnalyticsChanges, AnalyticsSummary, CommandCenter, DecisionEvent, DecisionHistory, DecisionJournalResponse, DistributionPoint, ExpertFeedback, ExpertReviewBreakdown, ExpertReviewSummary, FinancialImpact, FinancialImpactSummary, Finding, IntegrityCheck, Methodology, OrganizationComparison, OrganizationDetail, OrganizationsResponse, PatternChanges, PatternDetail, PatternGraph, PatternsResponse, PatternReviewStatus, PatternSummary, PatternTimelinePoint, PriorityHistoryPoint, PrioritySummary, RecurrenceHistory, RecurringPattern, Signal, SignalDetail, SignalPreview, SignalsResponse, TimelinePoint, ReviewStatus } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers }, cache: "no-store" });
   if (!response.ok) { const payload = await response.json().catch(() => ({})) as { detail?: string }; throw new Error(payload.detail ?? "Не удалось загрузить данные"); }
