@@ -52,7 +52,8 @@ Verimed — интеллектуальная система прозрачнос
 
 - frontend: Next.js App Router, TypeScript strict, Tailwind CSS, Recharts, TanStack Table;
 - backend: Python 3.12, FastAPI, SQLAlchemy, Pydantic, pandas, scikit-learn;
-- хранение: PostgreSQL через Docker Compose, SQLite для локальной проверки и тестов;
+- хранение: PostgreSQL через Docker Compose, SQLite для локальной проверки, тестов и
+  воспроизводимой публичной версии;
 - миграции: Alembic;
 - бизнес-логика: `backend/app/services`;
 - генерация: `backend/app/synthetic`.
@@ -185,22 +186,34 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api npm run dev
 
 В панели Vercel для проекта должны быть выбраны корень репозитория и Framework Preset `Services`. Поля Build Command, Install Command и Output Directory следует оставить без ручных значений: каждый сервис определяет сборку относительно собственного `root` из `vercel.json`.
 
-Обязательная переменная production-окружения:
+Для публичной версии без внешней базы задайте production-переменные:
 
 ```text
-DATABASE_URL=postgresql://<пользователь>:<пароль>@<хост>/<база>
+VERIMED_SHOWCASE_MODE=true
+AUTO_BOOTSTRAP_DATABASE=false
+NEXT_PUBLIC_API_URL=/api
 ```
 
-Адрес API уже имеет безопасное значение по умолчанию. При желании его можно закрепить явно вместе с отключением локальной инициализации базы:
+Backend поставляется с воспроизводимым синтетическим снимком для seed `20260712`. При
+холодном старте снимок копируется в доступный для записи временный каталог функции;
+миграции, генерация и аналитический конвейер при обработке запросов не запускаются.
+Изменения экспертных решений записываются только в рабочую копию текущего экземпляра.
+
+Публичная версия использует воспроизводимый синтетический набор. Экспертные решения в
+опубликованной версии могут сбрасываться при перезапуске среды.
+
+`DATABASE_URL` в этом режиме не требуется. Если одновременно заданы режим публичного
+снимка и внешний адрес базы, снимок имеет приоритет. Для постоянного production-хранилища
+отключите режим снимка и укажите PostgreSQL:
 
 ```text
-NEXT_PUBLIC_API_URL=/api
+VERIMED_SHOWCASE_MODE=false
+DATABASE_URL=postgresql://<пользователь>:<пароль>@<хост>/<база>
 AUTO_BOOTSTRAP_DATABASE=false
 ```
 
-`DATABASE_URL` должен указывать на внешнюю постоянную PostgreSQL-базу. Локальная SQLite при запуске в Vercel отклоняется конфигурацией. Стандартные URL `postgres://` и `postgresql://` автоматически используют установленный драйвер psycopg.
-
-Миграции и исходное заполнение выполняются один раз до первого рабочего запуска, а не при обработке запросов:
+Стандартные URL `postgres://` и `postgresql://` автоматически используют установленный
+драйвер psycopg. Внешняя база должна быть подготовлена один раз до рабочего запуска:
 
 ```bash
 cd backend
@@ -208,7 +221,12 @@ DATABASE_URL='<production-url>' AUTO_BOOTSTRAP_DATABASE=false alembic upgrade he
 DATABASE_URL='<production-url>' AUTO_BOOTSTRAP_DATABASE=false python -m app.seed
 ```
 
-После этого приложение запускается без `create_all` и генерации данных в lifespan Vercel-сервиса. Контрольный endpoint доступен по `/api/health`. Для использования Services проекту должен быть предоставлен доступ к этой возможности Vercel.
+Адрес API по умолчанию — `/api`. Контрольный endpoint `/api/health` сообщает режим
+хранения, готовность базы, наличие снимка и версию данных без раскрытия путей или секретов.
+Снимок можно воспроизвести командой
+`cd backend && python scripts/build_showcase_snapshot.py`; он содержит три
+последовательных запуска анализа и не изменяется работающим приложением. Для использования
+Services проекту должен быть предоставлен доступ к этой возможности Vercel.
 
 ## Основные маршруты интерфейса
 

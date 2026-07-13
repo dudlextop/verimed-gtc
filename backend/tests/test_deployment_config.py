@@ -18,6 +18,16 @@ def test_vercel_does_not_bootstrap_database_on_application_start() -> None:
     assert deployed.bootstrap_database_on_start is False
 
 
+def test_showcase_mode_uses_bundled_storage_without_database_url() -> None:
+    deployed = Settings(
+        vercel=True,
+        verimed_showcase_mode=True,
+        _env_file=None,
+    )
+    assert deployed.verimed_showcase_mode is True
+    assert deployed.bootstrap_database_on_start is False
+
+
 def test_local_development_keeps_explicit_bootstrap() -> None:
     local = Settings(
         database_url="sqlite:///./verimed.db",

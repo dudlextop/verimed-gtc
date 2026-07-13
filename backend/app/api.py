@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, showcase_snapshot_path, storage_mode
 from app.models import DecisionEntityType, ExpertDecisionEvent, RecurringPattern, RiskSignal
 from app.schemas import (
     AnalysisExecutionResponse,
@@ -26,6 +26,7 @@ from app.schemas import (
     FinancialImpactItem,
     FinancialImpactSummary,
     Finding,
+    HealthStatus,
     IntegrityCheckResult,
     Methodology,
     MethodologySection,
@@ -95,15 +96,20 @@ from app.services.recurring_patterns import (
     signal_patterns,
 )
 from app.services.signals import get_signal, list_signals, review_signal
+from app.services.storage_health import get_storage_health
 from app.synthetic.catalog import ANOMALY_LABELS
 
 router = APIRouter(prefix="/api")
 Db = Annotated[Session, Depends(get_db)]
 
 
-@router.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "message": "Сервис Verimed работает"}
+@router.get("/health", response_model=HealthStatus)
+def health(db: Db) -> HealthStatus:
+    return get_storage_health(
+        db,
+        storage_mode=storage_mode,
+        snapshot_ready=showcase_snapshot_path.is_file(),
+    )
 
 
 @router.get("/analytics/summary", response_model=AnalyticsSummary)

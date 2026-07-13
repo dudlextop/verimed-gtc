@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Self
 
 from pydantic import field_validator, model_validator
@@ -12,6 +13,8 @@ class Settings(BaseSettings):
     seed: int = 20260712
     vercel: bool = False
     vercel_env: str | None = None
+    verimed_showcase_mode: bool = False
+    verimed_showcase_temp_dir: Path | None = None
     auto_bootstrap_database: bool | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -35,7 +38,7 @@ class Settings(BaseSettings):
 
     @property
     def bootstrap_database_on_start(self) -> bool:
-        if self.is_vercel_deployment:
+        if self.verimed_showcase_mode or self.is_vercel_deployment:
             return False
         return self.auto_bootstrap_database if self.auto_bootstrap_database is not None else True
 
@@ -44,7 +47,11 @@ class Settings(BaseSettings):
         deployment_without_bootstrap = (
             self.is_vercel_deployment or self.auto_bootstrap_database is False
         )
-        if deployment_without_bootstrap and self.database_url.startswith("sqlite"):
+        if (
+            not self.verimed_showcase_mode
+            and deployment_without_bootstrap
+            and self.database_url.startswith("sqlite")
+        ):
             raise ValueError(
                 "Для развёртывания требуется внешняя база данных в DATABASE_URL; "
                 "локальная SQLite предназначена только для разработки и тестов"

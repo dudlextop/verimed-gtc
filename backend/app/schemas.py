@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -28,6 +29,14 @@ DECISION_REASON_CODES = {
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+
+class HealthStatus(ApiModel):
+    status: Literal["ok", "error"]
+    storage_mode: Literal["showcase_sqlite", "postgres", "local_sqlite"]
+    database_ready: bool
+    snapshot_ready: bool
+    data_version: str | None
 
 
 class Metric(ApiModel):

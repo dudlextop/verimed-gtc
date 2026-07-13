@@ -7,7 +7,13 @@ from app.services.analysis_pipeline import AnalysisExecution, MetricValues
 def test_health(client: TestClient) -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
+    assert response.json() == {
+        "status": "ok",
+        "storage_mode": "local_sqlite",
+        "database_ready": True,
+        "snapshot_ready": True,
+        "data_version": None,
+    }
 
 
 def test_summary_contains_live_counts(client: TestClient) -> None:
