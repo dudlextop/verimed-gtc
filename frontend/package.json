@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "postbuild": "node scripts/prepare-vercel-output.mjs",
     "start": "mkdir -p .next/standalone/public .next/standalone/.next/static && cp -R public/. .next/standalone/public && cp -R .next/static/. .next/standalone/.next/static && node .next/standalone/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
