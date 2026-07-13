@@ -833,7 +833,28 @@ def _main_organization(db: Session, pattern_id: int) -> str | None:
     )
 
 
-def _list_item(db: Session, pattern: RecurringPattern) -> PatternListItem:
+def _main_organizations(db: Session, pattern_ids: list[int]) -> dict[int, str]:
+    if not pattern_ids:
+        return {}
+    rows = db.execute(
+        select(PatternOrganization.pattern_id, MedicalOrganization.name)
+        .join(MedicalOrganization, MedicalOrganization.id == PatternOrganization.organization_id)
+        .where(PatternOrganization.pattern_id.in_(pattern_ids))
+        .order_by(
+            PatternOrganization.pattern_id,
+            PatternOrganization.is_primary.desc(),
+            PatternOrganization.signal_count.desc(),
+        )
+    ).all()
+    result: dict[int, str] = {}
+    for pattern_id, name in rows:
+        result.setdefault(pattern_id, name)
+    return result
+
+
+def _list_item_with_organization(
+    pattern: RecurringPattern, main_organization: str | None
+) -> PatternListItem:
     return PatternListItem(
         id=pattern.id,
         fingerprint=pattern.fingerprint,
@@ -858,9 +879,13 @@ def _list_item(db: Session, pattern: RecurringPattern) -> PatternListItem:
         importance_level=pattern.importance_level,
         review_status=pattern.review_status,
         formed_at=pattern.formed_at,
-        main_organization=_main_organization(db, pattern.id),
+        main_organization=main_organization,
         primary_reason=pattern.description,
     )
+
+
+def _list_item(db: Session, pattern: RecurringPattern) -> PatternListItem:
+    return _list_item_with_organization(pattern, _main_organization(db, pattern.id))
 
 
 def list_patterns(
@@ -928,6 +953,7 @@ def list_patterns(
             query.order_by(RecurringPattern.id).offset((page - 1) * page_size).limit(page_size)
         ).all()
     )
+    main_organizations = _main_organizations(db, [pattern.id for pattern in patterns])
     organization_rows = db.execute(
         select(MedicalOrganization.id, MedicalOrganization.name, func.count(PatternOrganization.id))
         .join(PatternOrganization, PatternOrganization.organization_id == MedicalOrganization.id)
@@ -937,7 +963,10 @@ def list_patterns(
         .order_by(MedicalOrganization.name)
     ).all()
     return PaginatedPatterns(
-        items=[_list_item(db, pattern) for pattern in patterns],
+        items=[
+            _list_item_with_organization(pattern, main_organizations.get(pattern.id))
+            for pattern in patterns
+        ],
         total=db.scalar(count_query) or 0,
         page=page,
         page_size=page_size,
@@ -1093,7 +1122,7 @@ def get_pattern_signals(db: Session, pattern_id: int) -> list[SignalListItem]:
             .order_by(ReviewPriority.score.desc())
         ).all()
     )
-    return [to_list_item(signal) for signal in signals]
+    return [to_list_item(signal, include_priority_details=False) for signal in signals]
 
 
 def get_pattern_timeline(db: Session, pattern_id: int) -> list[PatternTimelinePoint]:
@@ -1353,19 +1382,20 @@ def pattern_summary(db: Session) -> PatternSummary:
             .order_by(RecurringPattern.importance_score.desc(), RecurringPattern.id)
         ).all()
     )
-    unique_record_ids: set[int] = set()
-    for pattern in patterns:
-        signal_ids = db.scalars(
-            select(PatternSignal.signal_id).where(PatternSignal.pattern_id == pattern.id)
+    pattern_ids = [pattern.id for pattern in patterns]
+    signal_ids = set(
+        db.scalars(
+            select(PatternSignal.signal_id).where(PatternSignal.pattern_id.in_(pattern_ids))
         ).all()
-        priorities = (
-            db.scalars(select(ReviewPriority).where(ReviewPriority.signal_id.in_(signal_ids))).all()
-            if signal_ids
-            else []
-        )
-        unique_record_ids.update(
-            record_id for priority in priorities for record_id in priority.linked_record_ids
-        )
+    )
+    priorities = (
+        db.scalars(select(ReviewPriority).where(ReviewPriority.signal_id.in_(signal_ids))).all()
+        if signal_ids
+        else []
+    )
+    unique_record_ids = {
+        record_id for priority in priorities for record_id in priority.linked_record_ids
+    }
     records_by_id = (
         {
             record.id: record
@@ -1394,6 +1424,16 @@ def pattern_summary(db: Session) -> PatternSummary:
         if high_pattern_ids
         else 0
     )
+    selected_patterns = list(patterns[:5])
+    if patterns:
+        selected_patterns.append(max(patterns, key=lambda item: item.financial_significance))
+    main_organizations = _main_organizations(
+        db, list({pattern.id for pattern in selected_patterns})
+    )
+
+    def summary_item(pattern: RecurringPattern) -> PatternListItem:
+        return _list_item_with_organization(pattern, main_organizations.get(pattern.id))
+
     return PatternSummary(
         analysis_run_id=latest_run_id,
         total_patterns=len(patterns),
@@ -1421,13 +1461,13 @@ def pattern_summary(db: Session) -> PatternSummary:
             }
         ),
         new_patterns=sum(pattern.first_analysis_run_id == latest_run_id for pattern in patterns),
-        top_importance_pattern=_list_item(db, patterns[0]) if patterns else None,
-        top_financial_pattern=_list_item(
-            db, max(patterns, key=lambda item: item.financial_significance)
+        top_importance_pattern=summary_item(patterns[0]) if patterns else None,
+        top_financial_pattern=summary_item(
+            max(patterns, key=lambda item: item.financial_significance)
         )
         if patterns
         else None,
-        attention_patterns=[_list_item(db, pattern) for pattern in patterns[:5]],
+        attention_patterns=[summary_item(pattern) for pattern in patterns[:5]],
         disclaimer=PATTERN_DISCLAIMER,
     )
 
@@ -1503,7 +1543,11 @@ def organization_patterns(db: Session, organization_id: int) -> list[PatternList
             .order_by(RecurringPattern.importance_score.desc())
         ).all()
     )
-    return [_list_item(db, pattern) for pattern in patterns]
+    main_organizations = _main_organizations(db, [pattern.id for pattern in patterns])
+    return [
+        _list_item_with_organization(pattern, main_organizations.get(pattern.id))
+        for pattern in patterns
+    ]
 
 
 def signal_patterns(db: Session, signal_id: int) -> list[PatternListItem]:
@@ -1515,4 +1559,8 @@ def signal_patterns(db: Session, signal_id: int) -> list[PatternListItem]:
             .order_by(RecurringPattern.importance_score.desc())
         ).all()
     )
-    return [_list_item(db, pattern) for pattern in patterns]
+    main_organizations = _main_organizations(db, [pattern.id for pattern in patterns])
+    return [
+        _list_item_with_organization(pattern, main_organizations.get(pattern.id))
+        for pattern in patterns
+    ]

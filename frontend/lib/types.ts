@@ -50,3 +50,29 @@ export interface RecurrenceHistory { entity_fingerprint: string; first_detected_
 export interface IntegrityCheck { is_valid: boolean; checked_events: number; mismatch_count: number; details: string[]; checked_at: string; message: string }
 export interface ExpertReviewSummary { reviewed_signals: number; reviewed_patterns: number; confirmed_share: number | null; rejected_share: number | null; escalated_share: number | null; average_first_decision_hours: number | null; average_completion_hours: number | null; signals_without_decision: number; patterns_without_decision: number; in_progress: number; completed_current_period: number; sample_sufficient: boolean; sample_message: string | null; usefulness_distribution: Record<string, number>; explanation_quality_distribution: Record<string, number>; priority_correctness_distribution: Record<string, number> }
 export interface ExpertReviewBreakdown { category: string; total: number; confirmed: number; rejected: number; escalated: number }
+export interface PatternTypeDistribution { label: string; value: number; percent: number }
+export interface HomeAnalytics {
+  schema_version: number;
+  summary: AnalyticsSummary;
+  command_center: CommandCenter;
+  changes: AnalyticsChanges;
+  risk_distribution: DistributionPoint[];
+  timeline: TimelinePoint[];
+  findings: Finding[];
+  quality: AnalysisMetric;
+  pattern_summary: PatternSummary;
+  expert_review: ExpertReviewSummary;
+  priority_organizations: OrganizationsResponse;
+}
+export interface OverviewAnalytics {
+  schema_version: number;
+  summary: AnalyticsSummary;
+  command_center: CommandCenter;
+  changes: AnalyticsChanges;
+  priority_summary: PrioritySummary;
+  pattern_summary: PatternSummary;
+  pattern_changes: PatternChanges;
+  pattern_distribution: PatternTypeDistribution[];
+  quality: AnalysisMetric;
+  expert_review: ExpertReviewSummary;
+}

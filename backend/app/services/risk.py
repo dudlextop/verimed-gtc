@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from app.models import RiskLevel
 from app.services.detection import RuleDetection, detection_label
-from app.services.organization_model import OrganizationModelResult
+
+if TYPE_CHECKING:
+    from app.services.organization_model import OrganizationModelResult
 
 REQUIRED_LIMITATIONS = [
     "Анализ основан на доступных обезличенных данных.",

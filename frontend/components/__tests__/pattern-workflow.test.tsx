@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PatternPage from "@/app/patterns/[id]/page";
 import { PatternAttention } from "@/components/pattern-attention";
@@ -37,6 +37,7 @@ vi.mock("@/lib/api", () => ({
 
 describe("повторяющиеся модели", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     replace.mockReset();
     vi.mocked(api.patterns).mockResolvedValue({
       items: [patternFixture],
@@ -83,6 +84,22 @@ describe("повторяющиеся модели", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Центр диагностики Оңтүстік/ })[0]);
     expect(screen.getByRole("link", { name: "Открыть объект" })).toHaveAttribute("href", "/organizations/4");
     expect(screen.getByTestId("relationship-mobile-list")).toBeInTheDocument();
+  });
+
+  it("загружает граф карточки только при приближении раздела", async () => {
+    const notifications: Array<(entries: Array<{isIntersecting: boolean}>) => void> = [];
+    class DeferredObserver {
+      constructor(callback: (entries: Array<{isIntersecting: boolean}>) => void) { notifications.push(callback); }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("IntersectionObserver", DeferredObserver);
+    render(<PatternPage/>);
+    await screen.findByRole("heading", {name: patternFixture.name});
+    expect(api.patternGraph).not.toHaveBeenCalled();
+    act(() => notifications.forEach((notify) => notify([{isIntersecting: true}])));
+    await waitFor(() => expect(api.patternGraph).toHaveBeenCalledWith("7"));
+    vi.unstubAllGlobals();
   });
 
   it("скрывает второстепенные узлы графа до явного раскрытия", () => {

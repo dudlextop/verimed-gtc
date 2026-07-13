@@ -37,7 +37,7 @@ SIGNAL_OPTIONS = (
 )
 
 
-def to_list_item(signal: RiskSignal) -> SignalListItem:
+def to_list_item(signal: RiskSignal, *, include_priority_details: bool = True) -> SignalListItem:
     record = signal.record
     priority = signal.review_priority
     return SignalListItem(
@@ -57,9 +57,11 @@ def to_list_item(signal: RiskSignal) -> SignalListItem:
         priority_score=priority.score if priority else None,
         priority_level=priority.level if priority else None,
         financial_significance=priority.financial_significance if priority else None,
-        priority_factors=priority.factors if priority else [],
-        priority_explanation=priority.explanation if priority else None,
-        fingerprint=signal.fingerprint,
+        priority_factors=(priority.factors if priority and include_priority_details else []),
+        priority_explanation=(
+            priority.explanation if priority and include_priority_details else None
+        ),
+        fingerprint=signal.fingerprint if include_priority_details else None,
     )
 
 
@@ -145,7 +147,7 @@ def list_signals(
         ).all()
     ]
     return PaginatedSignals(
-        items=[to_list_item(signal) for signal in signals],
+        items=[to_list_item(signal, include_priority_details=False) for signal in signals],
         total=db.scalar(count_query) or 0,
         page=page,
         page_size=page_size,

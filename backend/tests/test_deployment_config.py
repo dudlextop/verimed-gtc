@@ -1,3 +1,8 @@
+import json
+import os
+import subprocess
+import sys
+
 import pytest
 from pydantic import ValidationError
 
@@ -44,3 +49,29 @@ def test_common_postgres_url_uses_installed_psycopg_driver() -> None:
         _env_file=None,
     )
     assert deployed.database_url.startswith("postgresql+psycopg://")
+
+
+def test_serving_import_does_not_load_ml_stack() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "VERIMED_SHOWCASE_MODE": "true",
+            "AUTO_BOOTSTRAP_DATABASE": "false",
+        }
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json, sys; import app.main; "
+                "print(json.dumps([name for name in ('pandas', 'numpy', 'sklearn') "
+                "if name in sys.modules]))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert json.loads(completed.stdout.strip()) == []

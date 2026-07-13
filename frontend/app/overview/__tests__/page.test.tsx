@@ -3,35 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OverviewPage from "@/app/overview/page";
 import { isAnalysisStale } from "@/lib/overview";
 import { OverviewActions } from "@/components/overview-actions";
-import { commandCenterFixture, patternFixture, patternSummaryFixture } from "@/components/__tests__/fixtures";
+import { commandCenterFixture, patternSummaryFixture } from "@/components/__tests__/fixtures";
 
-let callIndex = 0;
 const ready = (data: unknown) => ({data, loading: false, error: null, retry: vi.fn(), setData: vi.fn()});
 const summary = {analysis: {period: "01.01–30.06.2026", organizations_count: 20, records_count: 15000, last_analysis_at: "2026-07-12T09:30:00", processing_status: "Обработка завершена"}, priority: {high_risk_signals: 47, review_amount: "12400000", top_organization_id: 4, top_organization: "Центр диагностики № 4"}, metrics: []};
 const changes = {comparison_available: false, current_run_id: 8, previous_run_id: null, new_signals: 0, resolved_signals: 0, organizations_risk_increased: 0, organizations_risk_decreased: 0, review_amount_change: "0", completed_reviews: 0, selected_for_review_rate_change: 0};
-const financial = {analysis_run_id: 8, period: {scope_type: "period", scope_key: "current", total_services_amount: "90000000", signal_services_amount: "21522276", high_critical_amount: "18855647", confirmed_amount: "0", rejected_amount: "0", unreviewed_amount: "21522276", affected_records: 1849, affected_patients: 906, signal_amount_share: 0.238, disclaimer: "Сумма отражает объём услуг, связанных с сигналами риска."}, by_region: [], by_anomaly_type: []};
 const priorities = {analysis_run_id: 8, top_organization: commandCenterFixture.priority_organization, top_signal: commandCenterFixture.top_financial_signal, critical_priority_signals: 32, high_priority_signals: 68};
 const patternChanges = {comparison_available: false, current_run_id: 8, previous_run_id: null, new_patterns: 0, recurring_patterns: 0, disappeared_patterns: 0, importance_increased: 0, importance_decreased: 0};
 const quality = {precision: 0.7988, recall: 0.9592, f1: 0.8716, false_positive_rate: 0.021, true_positive_count: 1151, false_positive_count: 290, false_negative_count: 49, selected_for_review_rate: 0.0961, manual_review_reduction: 0.9039};
 const expert = {reviewed_signals: 2, reviewed_patterns: 0, confirmed_share: null, rejected_share: null, escalated_share: null, average_first_decision_hours: null, average_completion_hours: null, signals_without_decision: 91, patterns_without_decision: 42, in_progress: 1, completed_current_period: 0, sample_sufficient: false, sample_message: "Недостаточно экспертных решений для устойчивого вывода.", usefulness_distribution: {}, explanation_quality_distribution: {}, priority_correctness_distribution: {}};
 
-const responses = [
-  ready(summary),
-  ready(commandCenterFixture),
-  ready(changes),
-  ready(financial),
-  ready(priorities),
-  ready(patternSummaryFixture),
-  ready(patternChanges),
-  ready([patternFixture]),
-  ready(quality),
-  ready(expert),
-];
+const response = ready({schema_version: 1, summary, command_center: commandCenterFixture, changes, priority_summary: priorities, pattern_summary: patternSummaryFixture, pattern_changes: patternChanges, pattern_distribution: [{label: "Повторяющаяся услуга", value: 12, percent: 100}], quality, expert_review: expert});
 
-vi.mock("@/hooks/use-api", () => ({useApi: () => responses[callIndex++]}));
+vi.mock("@/hooks/use-api", () => ({useApi: () => response}));
 
 describe("аналитический обзор", () => {
-  beforeEach(() => { callIndex = 0; });
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it("получает данные и формирует главный вывод из значений API", () => {
     render(<OverviewPage/>);
@@ -39,7 +26,7 @@ describe("аналитический обзор", () => {
     expect(screen.getByText(/Verimed проанализировал/)).toHaveTextContent("15 000 медицинских услуг");
     expect(screen.getByText(/Verimed проанализировал/)).toHaveTextContent("1 441 запись");
     expect(screen.getByText(/Verimed проанализировал/)).toHaveTextContent("1 441 запись (9,61 %)");
-    expect(screen.getByText(/Verimed проанализировал/)).toHaveTextContent("21,5 млн");
+    expect(screen.getByText(/Verimed проанализировал/)).toHaveTextContent("15,1 млн");
   });
 
   it("показывает три приоритетных объекта с переходами", () => {

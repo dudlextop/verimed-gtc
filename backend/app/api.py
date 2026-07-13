@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -27,11 +29,13 @@ from app.schemas import (
     FinancialImpactSummary,
     Finding,
     HealthStatus,
+    HomeAnalytics,
     IntegrityCheckResult,
     Methodology,
     MethodologySection,
     OrganizationComparison,
     OrganizationDetail,
+    OverviewAnalytics,
     PaginatedOrganizations,
     PaginatedPatterns,
     PaginatedSignals,
@@ -52,8 +56,7 @@ from app.schemas import (
     SignalPreview,
     TimelinePoint,
 )
-from app.seed import regenerate_and_run
-from app.services.analysis_pipeline import latest_metrics, latest_metrics_by_type, run_analysis
+from app.services.analysis_metrics import latest_metrics, latest_metrics_by_type
 from app.services.analytics import (
     get_changes,
     get_command_center,
@@ -62,6 +65,7 @@ from app.services.analytics import (
     get_summary,
     get_timeline,
 )
+from app.services.analytics_pages import get_home_analytics, get_overview_analytics
 from app.services.expert_decisions import (
     add_pattern_event,
     add_signal_event,
@@ -95,11 +99,22 @@ from app.services.recurring_patterns import (
     review_pattern,
     signal_patterns,
 )
+from app.services.runtime_cache import invalidate_runtime_cache
 from app.services.signals import get_signal, list_signals, review_signal
 from app.services.storage_health import get_storage_health
 from app.synthetic.catalog import ANOMALY_LABELS
 
+if TYPE_CHECKING:
+    from app.services.analysis_pipeline import AnalysisExecution
+
 router = APIRouter(prefix="/api")
+
+
+def regenerate_and_run(db: Session, seed: int) -> AnalysisExecution:
+    """Load the data-generation stack only for its explicit maintenance endpoint."""
+    from app.seed import regenerate_and_run as execute
+
+    return execute(db, seed)
 Db = Annotated[Session, Depends(get_db)]
 
 
@@ -115,6 +130,22 @@ def health(db: Db) -> HealthStatus:
 @router.get("/analytics/summary", response_model=AnalyticsSummary)
 def analytics_summary(db: Db) -> AnalyticsSummary:
     return get_summary(db)
+
+
+@router.get("/analytics/home", response_model=HomeAnalytics)
+def analytics_home(db: Db) -> HomeAnalytics:
+    try:
+        return get_home_analytics(db)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from error
+
+
+@router.get("/analytics/overview", response_model=OverviewAnalytics)
+def analytics_overview(db: Db) -> OverviewAnalytics:
+    try:
+        return get_overview_analytics(db)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from error
 
 
 @router.get("/analytics/risk-distribution", response_model=list[DistributionPoint])
@@ -379,6 +410,7 @@ def create_signal_decision_event(
         event = add_signal_event(db, signal, payload)
         refresh_signal_priority(db, signal)
         db.commit()
+        invalidate_runtime_cache()
     except ValueError as error:
         db.rollback()
         raise HTTPException(422, str(error)) from error
@@ -394,6 +426,7 @@ def create_review(signal_id: int, payload: ReviewCreate, db: Db) -> SignalDetail
     result = review_signal(db, signal_id, payload)
     if not result:
         raise HTTPException(404, "Сигнал риска не найден")
+    invalidate_runtime_cache()
     return result
 
 
@@ -497,6 +530,7 @@ def create_pattern_decision_event(
     try:
         event = add_pattern_event(db, pattern, payload)
         db.commit()
+        invalidate_runtime_cache()
     except ValueError as error:
         db.rollback()
         raise HTTPException(422, str(error)) from error
@@ -512,13 +546,16 @@ def create_pattern_review(pattern_id: int, payload: PatternReviewCreate, db: Db)
     result = review_pattern(db, pattern_id, payload)
     if result is None:
         raise HTTPException(404, "Повторяющаяся модель не найдена")
+    invalidate_runtime_cache()
     return result
 
 
 @router.post("/analysis/build-patterns", response_model=PatternBuildResponse)
 def execute_pattern_build(db: Db) -> PatternBuildResponse:
     try:
-        return build_patterns(db)
+        result = build_patterns(db)
+        invalidate_runtime_cache()
+        return result
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
 
@@ -628,9 +665,15 @@ def analysis_metrics_by_type(db: Db) -> list[AnalysisMetricByType]:
 
 @router.post("/analysis/run", response_model=AnalysisExecutionResponse)
 def execute_analysis(payload: AnalysisRunRequest, db: Db) -> AnalysisExecutionResponse:
-    return AnalysisExecutionResponse.model_validate(asdict(run_analysis(db, payload.seed)))
+    from app.services.analysis_pipeline import run_analysis
+
+    result = AnalysisExecutionResponse.model_validate(asdict(run_analysis(db, payload.seed)))
+    invalidate_runtime_cache()
+    return result
 
 
 @router.post("/analysis/regenerate-and-run", response_model=AnalysisExecutionResponse)
 def execute_regeneration(payload: AnalysisRunRequest, db: Db) -> AnalysisExecutionResponse:
-    return AnalysisExecutionResponse.model_validate(asdict(regenerate_and_run(db, payload.seed)))
+    result = AnalysisExecutionResponse.model_validate(asdict(regenerate_and_run(db, payload.seed)))
+    invalidate_runtime_cache()
+    return result

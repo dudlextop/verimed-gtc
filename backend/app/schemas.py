@@ -705,6 +705,39 @@ class ExpertReviewBreakdownItem(ApiModel):
     escalated: int
 
 
+class PatternTypeDistribution(ApiModel):
+    label: str
+    value: int
+    percent: float
+
+
+class HomeAnalytics(ApiModel):
+    schema_version: int
+    summary: AnalyticsSummary
+    command_center: CommandCenter
+    changes: AnalyticsChanges
+    risk_distribution: list[DistributionPoint]
+    timeline: list[TimelinePoint]
+    findings: list[Finding]
+    quality: AnalysisMetricItem
+    pattern_summary: PatternSummary
+    expert_review: ExpertReviewSummary
+    priority_organizations: PaginatedOrganizations
+
+
+class OverviewAnalytics(ApiModel):
+    schema_version: int
+    summary: AnalyticsSummary
+    command_center: CommandCenter
+    changes: AnalyticsChanges
+    priority_summary: PrioritySummary
+    pattern_summary: PatternSummary
+    pattern_changes: PatternChanges
+    pattern_distribution: list[PatternTypeDistribution]
+    quality: AnalysisMetricItem
+    expert_review: ExpertReviewSummary
+
+
 OrganizationDetail.model_rebuild()
 OrganizationListItem.model_rebuild()
 ReviewCreate.model_rebuild()

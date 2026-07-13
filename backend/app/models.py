@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -164,6 +165,9 @@ class MedicalRecord(Base):
 
 class RiskSignal(Base):
     __tablename__ = "risk_signals"
+    __table_args__ = (
+        Index("ix_risk_signals_status_level_created", "status", "level", "created_at"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     medical_record_id: Mapped[int] = mapped_column(
         ForeignKey("medical_records.id"), unique=True, index=True
@@ -191,7 +195,7 @@ class RiskSignal(Base):
         default=ReviewStatus.UNREVIEWED,
         index=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
     record: Mapped[MedicalRecord] = relationship(back_populates="signal")
     organization: Mapped[MedicalOrganization] = relationship(back_populates="signals")
     factors: Mapped[list[RiskFactor]] = relationship(
@@ -303,6 +307,10 @@ class AnalysisMetric(Base):
 
 class ReviewPriority(Base):
     __tablename__ = "review_priorities"
+    __table_args__ = (
+        Index("ix_review_priorities_analysis_score", "analysis_run_id", "score"),
+        Index("ix_review_priorities_level_score", "level", "score"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     analysis_run_id: Mapped[int] = mapped_column(ForeignKey("analysis_runs.id"), index=True)
     signal_id: Mapped[int] = mapped_column(ForeignKey("risk_signals.id"), unique=True, index=True)
@@ -310,7 +318,7 @@ class ReviewPriority(Base):
     level: Mapped[RiskLevel] = mapped_column(
         Enum(RiskLevel, values_callable=lambda items: [item.value for item in items]), index=True
     )
-    financial_significance: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    financial_significance: Mapped[Decimal] = mapped_column(Numeric(14, 2), index=True)
     linked_record_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     repetition_count: Mapped[int] = mapped_column(Integer)
     affected_patients: Mapped[int] = mapped_column(Integer)
@@ -339,6 +347,14 @@ class FinancialImpactSnapshot(Base):
 
 class OrganizationPrioritySnapshot(Base):
     __tablename__ = "organization_priority_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_organization_priority_snapshots_run_score",
+            "analysis_run_id",
+            "score",
+            "organization_id",
+        ),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     analysis_run_id: Mapped[int] = mapped_column(ForeignKey("analysis_runs.id"), index=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("medical_organizations.id"), index=True)
@@ -377,6 +393,20 @@ class OrganizationComparisonSnapshot(Base):
 
 class RecurringPattern(Base):
     __tablename__ = "recurring_patterns"
+    __table_args__ = (
+        Index(
+            "ix_recurring_patterns_active_importance",
+            "is_active",
+            "importance_score",
+            "id",
+        ),
+        Index(
+            "ix_recurring_patterns_active_stability",
+            "is_active",
+            "stability_score",
+            "id",
+        ),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     fingerprint: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(220), index=True)

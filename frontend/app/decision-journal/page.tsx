@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { DecisionEvent } from "@/lib/types";
 import { useApi } from "@/hooks/use-api";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { dateTimeText } from "@/lib/utils";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { EmptyState, ErrorState, PageLoading } from "@/components/data-state";
@@ -23,9 +24,10 @@ export default function DecisionJournalPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selected, setSelected] = useState<DecisionEvent | null>(null);
+  const debouncedSearch = useDebouncedValue(search, 350);
   const params = useMemo(() => {
     const value = new URLSearchParams({ page_size: "50" });
-    if (search) value.set("search", search);
+    if (debouncedSearch) value.set("search", debouncedSearch);
     if (entityType) value.set("entity_type", entityType);
     if (action) value.set("action_type", action);
     if (decision) value.set("decision_status", decision);
@@ -36,7 +38,7 @@ export default function DecisionJournalPage() {
     if (dateFrom) value.set("date_from", dateFrom);
     if (dateTo) value.set("date_to", dateTo);
     return value.toString();
-  }, [search, entityType, action, decision, reviewer, organization, objectType, analysisRun, dateFrom, dateTo]);
+  }, [debouncedSearch, entityType, action, decision, reviewer, organization, objectType, analysisRun, dateFrom, dateTo]);
   const journal = useApi(() => api.decisionJournal(params), [params]);
   const integrity = useApi(api.journalIntegrity);
   if (journal.loading || integrity.loading) return <div className="page-shell"><PageLoading/></div>;

@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -33,7 +33,6 @@ from app.schemas import (
     PrioritySignalSummary,
     PrioritySummary,
 )
-from app.services.organization_model import form_peer_group
 
 FINANCIAL_DISCLAIMER = (
     "Финансовая значимость отражает объём медицинских услуг, связанных с выявленными "
@@ -272,6 +271,10 @@ def store_financial_priorities_and_comparisons(
     records: list[MedicalRecord],
     features: dict[int, dict[str, float]],
 ) -> None:
+    # The peer-group implementation imports scikit-learn for full analysis. Keep it
+    # outside the read-only serverless import path.
+    from app.services.organization_model import form_peer_group
+
     db.flush()
     signals = list(
         db.scalars(
@@ -689,17 +692,22 @@ def get_priority_summary(db: Session) -> PrioritySummary:
         )
         .order_by(ReviewPriority.financial_significance.desc(), ReviewPriority.score.desc())
     )
-    priorities = list(
-        db.scalars(select(ReviewPriority).where(ReviewPriority.analysis_run_id == run_id)).all()
-    )
+    level_counts: dict[RiskLevel, int] = {
+        level: count
+        for level, count in db.execute(
+            select(ReviewPriority.level, func.count(ReviewPriority.id))
+            .where(ReviewPriority.analysis_run_id == run_id)
+            .group_by(ReviewPriority.level)
+        ).all()
+    }
     return PrioritySummary(
         analysis_run_id=run_id,
         top_organization=(
             _priority_organization(db, organization_snapshot) if organization_snapshot else None
         ),
         top_signal=_priority_signal(top_signal) if top_signal else None,
-        critical_priority_signals=sum(item.level == RiskLevel.CRITICAL for item in priorities),
-        high_priority_signals=sum(item.level == RiskLevel.HIGH for item in priorities),
+        critical_priority_signals=level_counts.get(RiskLevel.CRITICAL, 0),
+        high_priority_signals=level_counts.get(RiskLevel.HIGH, 0),
     )
 
 

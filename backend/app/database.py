@@ -1,7 +1,7 @@
 from collections.abc import Generator
-from typing import Literal
+from typing import Any, Literal
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
@@ -33,8 +33,31 @@ else:
     effective_database_url = settings.database_url
     storage_mode = "postgres"
 
-connect_args = {"check_same_thread": False} if effective_database_url.startswith("sqlite") else {}
-engine = create_engine(effective_database_url, connect_args=connect_args, pool_pre_ping=True)
+is_sqlite = effective_database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False, "timeout": 30} if is_sqlite else {}
+engine = create_engine(
+    effective_database_url,
+    connect_args=connect_args,
+    pool_pre_ping=not is_sqlite,
+)
+
+
+if is_sqlite:
+
+    @event.listens_for(engine, "connect")
+    def configure_sqlite(dbapi_connection: Any, _: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA temp_store=MEMORY")
+        cursor.execute("PRAGMA cache_size=-20000")
+        if storage_mode == "showcase_sqlite":
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA mmap_size=67108864")
+        cursor.close()
+
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

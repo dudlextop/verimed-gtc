@@ -166,7 +166,7 @@ Backend требует Python 3.12:
 cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,analysis]'
 alembic upgrade head
 python -m app.seed
 uvicorn app.main:app --reload
@@ -227,6 +227,13 @@ DATABASE_URL='<production-url>' AUTO_BOOTSTRAP_DATABASE=false python -m app.seed
 `cd backend && python scripts/build_showcase_snapshot.py`; он содержит три
 последовательных запуска анализа и не изменяется работающим приложением. Для использования
 Services проекту должен быть предоставлен доступ к этой возможности Vercel.
+
+Для быстрого первого содержимого сводная аналитика и аналитический обзор используют по
+одному агрегированному API-ответу. Списки пагинируются на сервере, подробные графы и
+история загружаются по запросу, а публичные неизменяемые ответы получают безопасные
+cache-заголовки. Аналитический и ML-стек не импортируется при обычном GET или health-check.
+Измерения и правила кэширования: [docs/performance-audit.md](docs/performance-audit.md) и
+[docs/performance-architecture.md](docs/performance-architecture.md).
 
 ## Основные маршруты интерфейса
 

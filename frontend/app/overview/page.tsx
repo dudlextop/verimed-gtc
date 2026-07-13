@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import type { AnalyticsChanges, PatternChanges, RecurringPattern } from "@/lib/types";
+import type { AnalyticsChanges, PatternChanges } from "@/lib/types";
 import { dateTimeText, money, number, percent, plural } from "@/lib/utils";
 import { isAnalysisStale } from "@/lib/overview";
 import { ErrorState } from "@/components/data-state";
@@ -34,52 +34,33 @@ import { PRIORITY_QUEUE_URL } from "@/components/command-center";
 
 const SYNTHETIC_DATA_NOTE = "Показатели рассчитаны на воспроизводимом синтетическом наборе с известной эталонной разметкой.";
 
-async function loadAllPatterns(): Promise<RecurringPattern[]> {
-  const first = await api.patterns("page=1&page_size=100&sort=importance");
-  const pageCount = Math.ceil(first.total / first.page_size);
-  if (pageCount <= 1) return first.items;
-  const rest = await Promise.all(Array.from({length: pageCount - 1}, (_, index) => api.patterns(`page=${index + 2}&page_size=100&sort=importance`)));
-  return [first, ...rest].flatMap(page => page.items);
-}
-
 function OverviewPage() {
-  const summary = useApi(api.summary);
-  const command = useApi(api.commandCenter);
-  const changes = useApi(api.changes);
-  const financial = useApi(api.financialImpact);
-  const priorities = useApi(api.prioritySummary);
-  const patternSummary = useApi(api.patternSummary);
-  const patternChanges = useApi(api.patternChanges);
-  const patterns = useApi(loadAllPatterns);
-  const quality = useApi(api.analysisMetrics);
-  const expert = useApi(api.expertReviewSummary);
-
-  const requests = [summary, command, changes, financial, priorities, patternSummary, patternChanges, patterns, quality, expert];
-  if (requests.some(request => request.loading)) return <OverviewLoading/>;
-  const error = requests.find(request => request.error)?.error;
-  if (error || !summary.data || !command.data || !changes.data || !financial.data || !priorities.data || !patternSummary.data || !patternChanges.data || !patterns.data || !quality.data || !expert.data) {
-    return <div className="overview-shell"><ErrorState message={error ?? "Ответ сервиса неполон"} retry={() => requests.forEach(request => void request.retry())}/></div>;
+  const overview = useApi(api.overview, []);
+  if (overview.loading) return <OverviewLoading/>;
+  if (overview.error || !overview.data) {
+    return <div className="overview-shell"><ErrorState message={overview.error ?? "Ответ сервиса неполон"} retry={() => void overview.retry()}/></div>;
   }
 
-  const analysis = summary.data.analysis;
-  const selectedCount = quality.data.true_positive_count + quality.data.false_positive_count;
-  const reviewAmount = financial.data.period?.signal_services_amount ?? command.data.potential_review_amount;
-  const stale = isAnalysisStale(command.data.last_analysis_at);
-  const topOrganization = priorities.data.top_organization ?? command.data.priority_organization;
-  const topSignal = priorities.data.top_signal ?? command.data.top_financial_signal;
-  const topPattern = patternSummary.data.top_importance_pattern;
-  const distribution = patternDistribution(patterns.data);
+  const data = overview.data;
+  const analysis = data.summary.analysis;
+  const selectedCount = data.quality.true_positive_count + data.quality.false_positive_count;
+  const reviewAmount = data.command_center.potential_review_amount;
+  const stale = isAnalysisStale(data.command_center.last_analysis_at);
+  const topOrganization = data.priority_summary.top_organization ?? data.command_center.priority_organization;
+  const topSignal = data.priority_summary.top_signal ?? data.command_center.top_financial_signal;
+  const topPattern = data.pattern_summary.top_importance_pattern;
+  const distribution = data.pattern_distribution;
   const systemFindings = [
     {
       icon: Network,
       title: "Устойчивые модели",
-      text: `${number(patternSummary.data.high_stability_patterns)} повторяющихся моделей имеют высокую или очень высокую устойчивость.`,
+      text: `${number(data.pattern_summary.high_stability_patterns)} повторяющихся моделей имеют высокую или очень высокую устойчивость.`,
       href: "/patterns?sort=stability",
     },
     {
       icon: UsersRound,
       title: "Связанные пациенты",
-      text: `${number(patternSummary.data.affected_patients)} пациентов связаны с повторяющимися моделями текущего анализа.`,
+      text: `${number(data.pattern_summary.affected_patients)} пациентов связаны с повторяющимися моделями текущего анализа.`,
       href: "/patterns",
     },
     {
@@ -91,7 +72,7 @@ function OverviewPage() {
     {
       icon: FileSearch,
       title: "Объём ручной работы",
-      text: `Предварительный отбор сокращает объём ручного просмотра на ${percent(quality.data.manual_review_reduction)}.`,
+      text: `Предварительный отбор сокращает объём ручного просмотра на ${percent(data.quality.manual_review_reduction)}.`,
       href: PRIORITY_QUEUE_URL,
     },
   ];
@@ -99,7 +80,7 @@ function OverviewPage() {
   return <div className="overview-shell" data-testid="overview-root">
     <OverviewHeader
       period={analysis.period}
-      lastAnalysis={command.data.last_analysis_at}
+      lastAnalysis={data.command_center.last_analysis_at}
       organizations={analysis.organizations_count}
       status={analysis.processing_status}
       stale={stale}
@@ -110,12 +91,12 @@ function OverviewPage() {
         <div className="overview-hero-copy">
           <p className="overview-kicker"><ScanSearch className="h-4 w-4" aria-hidden="true"/>Главный результат</p>
           <h1 id="overview-result-title">Аналитический обзор</h1>
-          <p className="overview-conclusion">Verimed проанализировал <strong>{number(analysis.records_count)} медицинских услуг</strong> и отобрал для экспертной проверки <strong>{plural(selectedCount, ["запись", "записи", "записей"])} ({percent(quality.data.selected_for_review_rate, 2)})</strong>. Потенциальный объём проверки составляет <strong>{money(reviewAmount, true)}</strong>.</p>
+          <p className="overview-conclusion">Verimed проанализировал <strong>{number(analysis.records_count)} медицинских услуг</strong> и отобрал для экспертной проверки <strong>{plural(selectedCount, ["запись", "записи", "записей"])} ({percent(data.quality.selected_for_review_rate, 2)})</strong>. Потенциальный объём проверки составляет <strong>{money(reviewAmount, true)}</strong>.</p>
         </div>
         <div className="overview-metrics" aria-label="Ключевые показатели анализа">
           <OverviewMetric icon={Database} label="Проанализировано услуг" value={number(analysis.records_count)} prominent/>
-          <OverviewMetric icon={ClipboardCheck} label="Отобрано для проверки" value={number(selectedCount)} detail={percent(quality.data.selected_for_review_rate, 2)}/>
-          <OverviewMetric icon={TrendingUp} label="Сокращение ручного просмотра" value={percent(quality.data.manual_review_reduction)}/>
+          <OverviewMetric icon={ClipboardCheck} label="Отобрано для проверки" value={number(selectedCount)} detail={percent(data.quality.selected_for_review_rate, 2)}/>
+          <OverviewMetric icon={TrendingUp} label="Сокращение ручного просмотра" value={percent(data.quality.manual_review_reduction)}/>
           <OverviewMetric icon={CircleDollarSign} label="Потенциальный объём проверки" value={money(reviewAmount, true)} tone="finance"/>
         </div>
       </section>
@@ -138,23 +119,23 @@ function OverviewPage() {
         <section className="overview-section overview-quality" aria-labelledby="quality-title">
           <OverviewSectionTitle icon={CheckCircle2} title="Качество анализа"/>
           <div className="overview-quality-grid">
-            <QualityValue label="Точность выявления" value={quality.data.precision}/>
-            <QualityValue label="Полнота выявления" value={quality.data.recall}/>
-            <QualityValue label="F1-мера" value={quality.data.f1}/>
-            <QualityValue label="Ложноположительные записи" value={quality.data.false_positive_rate}/>
+            <QualityValue label="Точность выявления" value={data.quality.precision}/>
+            <QualityValue label="Полнота выявления" value={data.quality.recall}/>
+            <QualityValue label="F1-мера" value={data.quality.f1}/>
+            <QualityValue label="Ложноположительные записи" value={data.quality.false_positive_rate}/>
           </div>
           <p className="overview-method-note">{SYNTHETIC_DATA_NOTE}</p>
-          {!expert.data.sample_sufficient && <p className="overview-sample-note">{expert.data.sample_message ?? "Недостаточно экспертных решений для устойчивого вывода."}</p>}
+          {!data.expert_review.sample_sufficient && <p className="overview-sample-note">{data.expert_review.sample_message ?? "Недостаточно экспертных решений для устойчивого вывода."}</p>}
         </section>
 
         <section className="overview-section overview-patterns" aria-labelledby="patterns-title">
           <OverviewSectionTitle icon={Layers3} title="Повторяющиеся модели"/>
-          {patternSummary.data.total_patterns > 0 ? <>
+          {data.pattern_summary.total_patterns > 0 ? <>
             <div className="overview-pattern-stats">
-              <SmallStat label="Всего" value={number(patternSummary.data.total_patterns)}/>
-              <SmallStat label="Высокая устойчивость" value={number(patternSummary.data.high_stability_patterns)}/>
-              <SmallStat label="Организации" value={number(patternSummary.data.affected_organizations)}/>
-              <SmallStat label="Финансовая значимость" value={money(patternSummary.data.financial_significance, true)} finance/>
+              <SmallStat label="Всего" value={number(data.pattern_summary.total_patterns)}/>
+              <SmallStat label="Высокая устойчивость" value={number(data.pattern_summary.high_stability_patterns)}/>
+              <SmallStat label="Организации" value={number(data.pattern_summary.affected_organizations)}/>
+              <SmallStat label="Финансовая значимость" value={money(data.pattern_summary.financial_significance, true)} finance/>
             </div>
             <div className="overview-distribution" aria-label="Распределение моделей по типам">{distribution.slice(0, 4).map(item => <div key={item.label} className="overview-distribution-row"><div><span>{item.label}</span><strong>{number(item.value)}</strong></div><div className="overview-distribution-track"><span style={{width: `${item.percent}%`}}/></div></div>)}</div>
           </> : <p className="overview-compact-empty">Повторяющиеся модели пока не сформированы. Для анализа требуется несколько периодов наблюдений.</p>}
@@ -162,7 +143,7 @@ function OverviewPage() {
       </div>
 
       <div className="overview-bottom-grid">
-        <ChangesSummary changes={changes.data} patternChanges={patternChanges.data}/>
+        <ChangesSummary changes={data.changes} patternChanges={data.pattern_changes}/>
         <section className="overview-recommendation" aria-labelledby="recommendation-title">
           <div><p className="overview-kicker"><Flag className="h-4 w-4" aria-hidden="true"/>Рекомендуемое действие</p><h2 id="recommendation-title">Начать приоритетную проверку</h2><p>{topOrganization ? `Начните с ${topOrganization.name}: приоритет ${topOrganization.priority_score} из 100 · ${number(topOrganization.high_risk_signals)} сигналов · ${money(topOrganization.review_amount)}.` : "Перейдите к сигналам с наибольшим текущим приоритетом."}</p></div>
           <Link href={PRIORITY_QUEUE_URL} className="overview-primary-action print:hidden">Перейти к приоритетной проверке<ArrowRight className="h-4 w-4" aria-hidden="true"/></Link>
@@ -210,13 +191,6 @@ function ChangesSummary({ changes, patternChanges }: { changes: AnalyticsChanges
 
 function ChangeValue({ value, label }: { value: string; label: string }) {
   return <div><strong>{value}</strong><span>{label}</span></div>;
-}
-
-function patternDistribution(patterns: RecurringPattern[]): { label: string; value: number; percent: number }[] {
-  const counts = new Map<string, number>();
-  for (const pattern of patterns) counts.set(pattern.pattern_type_label, (counts.get(pattern.pattern_type_label) ?? 0) + 1);
-  const max = Math.max(...counts.values(), 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({label, value, percent: (value / max) * 100}));
 }
 
 function OverviewLoading() {

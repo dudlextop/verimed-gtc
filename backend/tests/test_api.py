@@ -25,6 +25,36 @@ def test_summary_contains_live_counts(client: TestClient) -> None:
     assert len(payload["metrics"]) == 5
 
 
+def test_page_aggregates_are_compact_and_consistent(client: TestClient) -> None:
+    home = client.get("/api/analytics/home")
+    overview = client.get("/api/analytics/overview")
+    assert home.status_code == overview.status_code == 200
+    home_payload = home.json()
+    overview_payload = overview.json()
+    assert home_payload["schema_version"] == overview_payload["schema_version"] == 1
+    assert home_payload["summary"] == overview_payload["summary"]
+    assert home_payload["command_center"] == overview_payload["command_center"]
+    assert overview_payload["pattern_distribution"]
+
+
+def test_signal_list_is_paginated_and_does_not_embed_detail(client: TestClient) -> None:
+    response = client.get("/api/signals?page=2&page_size=7&sort=priority")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 2
+    assert payload["page_size"] == 7
+    assert len(payload["items"]) == 7
+    assert payload["items"][0]["priority_factors"] == []
+    assert payload["items"][0]["priority_explanation"] is None
+
+
+def test_cache_headers_exclude_mutable_review_data(client: TestClient) -> None:
+    stable = client.get("/api/analytics/summary")
+    mutable = client.get("/api/signals?page_size=1")
+    assert stable.headers["cache-control"].startswith("public")
+    assert mutable.headers["cache-control"] == "no-store"
+
+
 def test_organizations_and_detail(client: TestClient) -> None:
     response = client.get("/api/organizations?page_size=5")
     assert response.status_code == 200
@@ -148,6 +178,8 @@ def test_all_public_read_routes_return_structured_responses(client: TestClient) 
     paths = [
         "/api/health",
         "/api/analytics/summary",
+        "/api/analytics/home",
+        "/api/analytics/overview",
         "/api/analytics/risk-distribution",
         "/api/analytics/timeline",
         "/api/analytics/key-findings",
@@ -190,5 +222,5 @@ def test_all_public_read_routes_return_structured_responses(client: TestClient) 
         "/api/analysis/metrics/by-anomaly-type",
     ]
     statuses = {path: client.get(path).status_code for path in paths}
-    assert len(paths) == 42
+    assert len(paths) == 44
     assert statuses == {path: 200 for path in paths}

@@ -13,7 +13,12 @@ describe("адрес API", () => {
     await api.summary();
     expect(fetch).toHaveBeenCalledWith(
       "/api/analytics/summary",
-      expect.objectContaining({ cache: "no-store" }),
+      expect.objectContaining({ cache: "default" }),
     );
+  });
+
+  it("объединяет одновременные одинаковые запросы", async () => {
+    await Promise.all([api.home(), api.home()]);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

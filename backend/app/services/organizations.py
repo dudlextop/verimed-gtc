@@ -1,7 +1,7 @@
 from collections import Counter
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -91,9 +91,7 @@ def list_organizations(
     status: str | None,
     sort: str,
 ) -> PaginatedOrganizations:
-    query = select(MedicalOrganization).options(
-        selectinload(MedicalOrganization.records), selectinload(MedicalOrganization.signals)
-    )
+    query = select(MedicalOrganization)
     count_query = select(func.count(MedicalOrganization.id))
     filters = []
     if search:
@@ -120,10 +118,86 @@ def list_organizations(
         filters.append(MedicalOrganization.risk_score.between(low, high))
     query = query.where(*filters)
     count_query = count_query.where(*filters)
-    order = (
-        MedicalOrganization.name.asc() if sort == "name" else MedicalOrganization.risk_score.desc()
-    )
-    orgs = db.scalars(query.order_by(order).offset((page - 1) * page_size).limit(page_size)).all()
+    latest_run_id = db.scalar(select(func.max(AnalysisRun.id)))
+    if sort in {"priority", "financial"} and latest_run_id is not None:
+        query = query.outerjoin(
+            OrganizationPrioritySnapshot,
+            and_(
+                OrganizationPrioritySnapshot.organization_id == MedicalOrganization.id,
+                OrganizationPrioritySnapshot.analysis_run_id == latest_run_id,
+            ),
+        )
+        query = query.order_by(
+            OrganizationPrioritySnapshot.financial_significance.desc()
+            if sort == "financial"
+            else OrganizationPrioritySnapshot.score.desc()
+        )
+    else:
+        query = query.order_by(
+            MedicalOrganization.name.asc()
+            if sort == "name"
+            else MedicalOrganization.risk_score.desc()
+        )
+    orgs = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
+    organization_ids = [organization.id for organization in orgs]
+    record_stats = {
+        organization_id: (services_count, total_amount or Decimal("0"))
+        for organization_id, services_count, total_amount in db.execute(
+            select(
+                MedicalRecord.organization_id,
+                func.count(MedicalRecord.id),
+                func.sum(MedicalRecord.amount),
+            )
+            .where(MedicalRecord.organization_id.in_(organization_ids))
+            .group_by(MedicalRecord.organization_id)
+        ).all()
+    }
+    signal_counts: dict[int, int] = {}
+    primary_reasons: dict[int, tuple[str, int]] = {}
+    for organization_id, reason, reason_count in db.execute(
+        select(RiskSignal.organization_id, RiskSignal.primary_reason, func.count(RiskSignal.id))
+        .where(RiskSignal.organization_id.in_(organization_ids))
+        .group_by(RiskSignal.organization_id, RiskSignal.primary_reason)
+        .order_by(RiskSignal.organization_id, func.count(RiskSignal.id).desc())
+    ).all():
+        signal_counts[organization_id] = signal_counts.get(organization_id, 0) + reason_count
+        current = primary_reasons.get(organization_id)
+        if current is None or reason_count > current[1]:
+            primary_reasons[organization_id] = (reason, reason_count)
+    priority_snapshots = {
+        snapshot.organization_id: snapshot
+        for snapshot in (
+            db.scalars(
+                select(OrganizationPrioritySnapshot).where(
+                    OrganizationPrioritySnapshot.analysis_run_id == latest_run_id,
+                    OrganizationPrioritySnapshot.organization_id.in_(organization_ids),
+                )
+            ).all()
+            if latest_run_id is not None
+            else []
+        )
+    }
+    histories: dict[int, list[PriorityHistoryPoint]] = {
+        organization_id: [] for organization_id in organization_ids
+    }
+    for snapshot, run in db.execute(
+        select(OrganizationPrioritySnapshot, AnalysisRun)
+        .join(AnalysisRun, AnalysisRun.id == OrganizationPrioritySnapshot.analysis_run_id)
+        .where(OrganizationPrioritySnapshot.organization_id.in_(organization_ids))
+        .order_by(
+            OrganizationPrioritySnapshot.organization_id,
+            OrganizationPrioritySnapshot.analysis_run_id,
+        )
+    ).all():
+        histories[snapshot.organization_id].append(
+            PriorityHistoryPoint(
+                analysis_run_id=snapshot.analysis_run_id,
+                period=run.completed_at.strftime("%d.%m %H:%M"),
+                value=snapshot.score,
+                level=snapshot.level,
+                financial_significance=snapshot.financial_significance,
+            )
+        )
     regions = list(
         db.scalars(
             select(MedicalOrganization.region).distinct().order_by(MedicalOrganization.region)
@@ -137,7 +211,51 @@ def list_organizations(
         ).all()
     )
     return PaginatedOrganizations(
-        items=[_organization_item(db, org) for org in orgs],
+        items=[
+            OrganizationListItem(
+                id=organization.id,
+                name=organization.name,
+                region=organization.region,
+                organization_type=organization.organization_type,
+                services_count=record_stats.get(organization.id, (0, Decimal("0")))[0],
+                total_amount=record_stats.get(organization.id, (0, Decimal("0")))[1],
+                signals_count=signal_counts.get(organization.id, 0),
+                risk_score=organization.risk_score,
+                risk_level=risk_level_for_score(organization.risk_score),
+                primary_reason=primary_reasons.get(organization.id, ("Нет значимых отклонений", 0))[
+                    0
+                ],
+                review_status=organization.review_status,
+                priority_score=(
+                    priority_snapshots[organization.id].score
+                    if organization.id in priority_snapshots
+                    else None
+                ),
+                priority_level=(
+                    priority_snapshots[organization.id].level
+                    if organization.id in priority_snapshots
+                    else None
+                ),
+                financial_significance=(
+                    priority_snapshots[organization.id].financial_significance
+                    if organization.id in priority_snapshots
+                    else None
+                ),
+                affected_patients=(
+                    priority_snapshots[organization.id].affected_patients
+                    if organization.id in priority_snapshots
+                    else None
+                ),
+                unreviewed_share=(
+                    priority_snapshots[organization.id].unreviewed_share
+                    if organization.id in priority_snapshots
+                    else None
+                ),
+                priority_factors=[],
+                priority_history=histories.get(organization.id, []),
+            )
+            for organization in orgs
+        ],
         total=db.scalar(count_query) or 0,
         page=page,
         page_size=page_size,
