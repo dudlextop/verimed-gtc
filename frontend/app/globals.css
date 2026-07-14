@@ -4,6 +4,72 @@
 
 @layer base {
   :root {
+    /* Verimed V2 foundation. Legacy HSL variables below remain during route migration. */
+    --v2-canvas: #f7f9fc;
+    --v2-surface: #ffffff;
+    --v2-surface-soft: #f2f6fb;
+    --v2-surface-selected: #edf4ff;
+    --v2-border: #dce5f1;
+    --v2-border-strong: #c6d3e5;
+    --v2-text: #071a42;
+    --v2-text-secondary: #506180;
+    --v2-text-muted: #74829b;
+    --v2-text-disabled: #9aa6b9;
+
+    --v2-primary: #0f5ef7;
+    --v2-primary-hover: #0a4edb;
+    --v2-primary-active: #083eb8;
+    --v2-primary-soft: #eaf2ff;
+    --v2-cyan: #08b9e8;
+    --v2-cyan-soft: #e9fafe;
+    --v2-cyan-text: #06718e;
+    --v2-teal: #0b8f7a;
+    --v2-teal-soft: #eaf8f5;
+    --v2-teal-text: #087260;
+
+    --v2-success: #159b67;
+    --v2-success-soft: #eaf8f1;
+    --v2-success-text: #0b7650;
+    --v2-warning: #c97800;
+    --v2-warning-soft: #fff6e4;
+    --v2-warning-text: #8a5300;
+    --v2-critical: #d94c57;
+    --v2-critical-soft: #fff0f1;
+    --v2-critical-text: #b62b3d;
+    --v2-high: #e56d22;
+    --v2-high-soft: #fff4ea;
+    --v2-high-text: #b94a12;
+    --v2-medium: #b78300;
+    --v2-medium-soft: #fff8dd;
+    --v2-medium-text: #946900;
+    --v2-low: #258b64;
+    --v2-low-soft: #ecf8f2;
+    --v2-low-text: #1a7050;
+    --v2-info: #0f5ef7;
+    --v2-info-soft: #edf4ff;
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+
+    --v2-radius-control: 0.625rem;
+    --v2-radius-card: 0.75rem;
+    --v2-radius-section: 0.875rem;
+    --v2-radius-overlay: 1rem;
+    --v2-shadow-panel: 0 16px 48px rgb(7 26 66 / 0.14);
+    --v2-shadow-dropdown: 0 12px 32px rgb(7 26 66 / 0.12);
+    --v2-shadow-sticky: 0 -12px 32px rgb(7 26 66 / 0.1);
+    --v2-focus-ring: 0 0 0 2px var(--v2-primary);
+    --v2-transition-micro: 100ms;
+    --v2-transition-short: 150ms;
+    --v2-transition-panel: 200ms;
+
     /* Core surfaces */
     --background: 222 45% 97%;
     --foreground: 223 48% 14%;
@@ -71,7 +137,7 @@
   body {
     @apply max-w-full overflow-x-clip bg-background text-foreground antialiased;
     min-height: 100vh;
-    font-family: Inter, "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--font-inter), Inter, Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     background-image:
       radial-gradient(circle at 78% -10%, hsl(244 80% 94% / 0.58), transparent 27rem),
@@ -84,7 +150,24 @@
   ::selection { background: hsl(var(--primary) / 0.18); color: hsl(var(--foreground)); }
 }
 
+@layer utilities {
+  .v2-tabular { font-variant-numeric: tabular-nums; }
+  .v2-technical-code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+}
+
 @layer components {
+  .v2-data-table tbody tr {
+    transition: background-color var(--v2-transition-micro) ease-out, box-shadow var(--v2-transition-micro) ease-out;
+  }
+  .v2-data-table tbody tr[data-selected="true"],
+  .v2-data-table tbody tr[aria-selected="true"] {
+    background: var(--v2-surface-selected);
+    box-shadow: inset 3px 0 0 var(--v2-primary);
+  }
+  @media (hover: hover) {
+    .v2-data-table tbody tr:hover { background: var(--v2-primary-soft); }
+  }
+
   .page-shell { @apply mx-auto w-full max-w-[1480px] px-4 py-5 md:px-6 md:py-7 xl:px-8 xl:py-8; }
   .eyebrow { @apply text-[0.6875rem] font-bold uppercase tracking-[0.18em] text-primary; }
   .table-cell { @apply px-4 py-3.5 text-left text-[0.8125rem] align-middle xl:px-5; }

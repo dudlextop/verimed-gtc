@@ -6,6 +6,7 @@ import { join } from "node:path";
 const baseUrl = process.env.VERIMED_BASE_URL ?? "http://127.0.0.1:3000";
 const apiUrl = process.env.VERIMED_API_URL ?? "http://127.0.0.1:8000/api";
 const output = process.env.VERIMED_VISUAL_OUTPUT ?? join(tmpdir(), "verimed-visuals");
+const includeFoundation = process.env.VERIMED_INCLUDE_FOUNDATION === "true" || process.argv.includes("--foundation");
 const widths = [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -47,6 +48,7 @@ const pages = [
   ["pattern-card", `/patterns/${patternId}`],
   ["decision-journal", "/decision-journal"],
 ];
+if (includeFoundation) pages.push(["foundation-v2", "/foundation-preview"]);
 
 mkdirSync(output, { recursive: true });
 const manifest = [];

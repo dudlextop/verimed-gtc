@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "visual:check": "node scripts/capture-visuals.mjs"
+    "visual:check": "node scripts/capture-visuals.mjs",
+    "visual:foundation": "node scripts/capture-visuals.mjs --foundation"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",

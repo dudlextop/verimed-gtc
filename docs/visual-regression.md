@@ -22,6 +22,21 @@ VERIMED_VISUAL_OUTPUT=/tmp/verimed-review npm run visual:check
 
 Если Chrome установлен нестандартно, укажите `CHROME_BIN`. Бинарные снимки в репозиторий не добавляются. `manifest.json` фиксирует маршрут, ширину и имя каждого файла.
 
+## Foundation V2
+
+Внутренний маршрут `/foundation-preview` не входит в стандартную пользовательскую матрицу. Для проверки foundation запустите frontend с явным флагом и используйте отдельную команду:
+
+```bash
+cd frontend
+NEXT_PUBLIC_ENABLE_FOUNDATION_HARNESS=true NEXT_PUBLIC_API_URL=http://localhost:8000/api npm run dev
+# во втором терминале
+VERIMED_VISUAL_OUTPUT=/tmp/verimed-foundation npm run visual:foundation
+```
+
+Команда создаёт стандартные 27 снимков и ещё три снимка foundation на 1440, 768 и 375 px. В production маршрут возвращает 404 без `NEXT_PUBLIC_ENABLE_FOUNDATION_HARNESS=true`; включать его в пользовательское развёртывание не требуется.
+
+15 июля 2026 года foundation-матрица успешно создала 30 снимков. Дополнительно проверены 200% device scale, `prefers-reduced-motion`, мобильные touch targets, отсутствие горизонтального переполнения и ошибок браузерной консоли.
+
 ## Матрица
 
 Ширины: 1440, 768 и 375 px. Матрица содержит 27 снимков: девять маршрутов на трёх ширинах.
