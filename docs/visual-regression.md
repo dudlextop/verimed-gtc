@@ -59,7 +59,30 @@ VERIMED_VISUAL_OUTPUT=/tmp/verimed-v2-shell npm run visual:shell
 
 15 июля 2026 года production-матрица создала 20 маршрутных снимков и 5 интерактивных снимков shell. Проверены реальные API-данные, открытые и закрытые состояния sheet, эквивалент 200% zoom, Escape, focus trap, return focus и отсутствие document overflow.
 
-## Матрица
+## Review flow V2
+
+Для очереди и карточки сигнала используется отдельная команда:
+
+```bash
+cd frontend
+VERIMED_VISUAL_OUTPUT=/tmp/verimed-v2-review-flow npm run visual:review-flow
+```
+
+Сценарий управляет headless Chrome через DevTools Protocol: ждёт фактическое состояние API, задаёт точный CSS viewport и не фиксирует случайный skeleton из-за virtual time. Это необходимо для корректной проверки 375 px в Chrome, где простого `--window-size` недостаточно.
+
+Матрица содержит 45 снимков на 1440, 768 и 375 px:
+
+- очередь по умолчанию;
+- активные фильтры;
+- активный выбор;
+- empty, loading и error;
+- открытый быстрый просмотр, вторичное disclosure, loading и error;
+- четыре этапа карточки сигнала;
+- карточка при `prefers-reduced-motion: reduce`.
+
+16 июля 2026 года матрица успешно создана во временном каталоге. Дополнительно в браузере проверены 1280 и 1024 px, отсутствие document overflow, полноэкранная мобильная панель, 44×44 px controls, Escape, focus trap, return focus, keyboard selector этапов, sticky bar, reduced motion и масштабирование 200%. Бинарные снимки в репозиторий не добавлены.
+
+## Общая матрица
 
 Ширины: 1440, 768 и 375 px. Матрица содержит 27 снимков: девять маршрутов на трёх ширинах.
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignalPreviewPanel } from "@/components/signal-preview-panel";
@@ -62,5 +63,36 @@ describe("быстрый просмотр сигнала", () => {
     vi.mocked(api.signalPreview).mockResolvedValueOnce(null as never);
     render(<SignalPreviewPanel signalId={10} onClose={vi.fn()} onUpdated={vi.fn()}/>);
     expect(await screen.findByText("Сигнал недоступен")).toBeInTheDocument();
+  });
+
+  it("блокирует прокрутку фона, удерживает фокус и возвращает его при закрытии", async () => {
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      return <><button type="button" onClick={() => setOpen(true)}>Открыть сигнал</button>{open && <SignalPreviewPanel signalId={10} onClose={() => setOpen(false)} onUpdated={vi.fn()}/>}</>;
+    }
+    render(<Harness/>);
+    const trigger = screen.getByRole("button", { name: "Открыть сигнал" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByText("Компьютерная томография");
+    expect(document.body.style.overflow).toBe("hidden");
+    const dialog = screen.getByRole("dialog");
+    const controls = Array.from(dialog.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), details > summary"));
+    controls.at(-1)?.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(controls[0]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("отключает навигацию на границе очереди и раскрывает вторичный контекст по запросу", async () => {
+    render(<SignalPreviewPanel signalId={10} previousId={null} nextId={null} onClose={vi.fn()} onUpdated={vi.fn()}/>);
+    await screen.findByText("Компьютерная томография");
+    expect(screen.getByRole("button", { name: "Предыдущий сигнал" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Следующий сигнал" })).toBeDisabled();
+    const rationale = screen.getByText("Обоснование").closest("details");
+    fireEvent.click(screen.getByText("Обоснование"));
+    expect(rationale).toHaveAttribute("open");
   });
 });

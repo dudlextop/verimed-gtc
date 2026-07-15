@@ -38,7 +38,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
 );
 Textarea.displayName = "Textarea";
 
-export function Checkbox({ label, description, className, id, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label?: string; description?: string }) {
+export const Checkbox = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { label?: string; description?: string }>(function Checkbox({ label, description, className, id, ...props }, ref) {
   const generatedId = React.useId();
   const controlId = id ?? generatedId;
   const descriptionId = description ? `${controlId}-description` : undefined;
@@ -46,6 +46,7 @@ export function Checkbox({ label, description, className, id, ...props }: React.
     <label htmlFor={controlId} className={cn("inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm text-v2-text", className)}>
       <span className="relative grid h-5 w-5 shrink-0 place-items-center">
         <input
+          ref={ref}
           id={controlId}
           aria-describedby={descriptionId}
           className="peer h-5 w-5 appearance-none rounded border border-v2-border-strong bg-v2-surface checked:border-v2-primary checked:bg-v2-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary focus-visible:ring-offset-2"
@@ -62,7 +63,8 @@ export function Checkbox({ label, description, className, id, ...props }: React.
       )}
     </label>
   );
-}
+});
+Checkbox.displayName = "Checkbox";
 
 export interface ActiveFilter {
   id: string;
@@ -106,7 +108,7 @@ export function FilterBar({ primary, advanced, activeFilters = [], activeCount, 
   return (
     <section aria-label="Фильтры" className={cn("rounded-v2-section border border-v2-border bg-v2-surface p-4", className)}>
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{primary}</div>
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">{primary}</div>
         <div className="flex flex-wrap items-center gap-2">
           {advanced && (
             <Button

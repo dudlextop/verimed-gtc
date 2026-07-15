@@ -12,7 +12,8 @@
     "test": "vitest",
     "visual:check": "node scripts/capture-visuals.mjs",
     "visual:foundation": "node scripts/capture-visuals.mjs --foundation",
-    "visual:shell": "node scripts/capture-visuals.mjs --shell"
+    "visual:shell": "node scripts/capture-visuals.mjs --shell",
+    "visual:review-flow": "node scripts/capture-visuals.mjs --review-flow"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",

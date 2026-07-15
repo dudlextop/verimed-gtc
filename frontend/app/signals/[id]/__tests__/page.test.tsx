@@ -16,6 +16,7 @@ vi.mock("@/lib/api", () => ({api: {
 
 describe("пошаговая карточка сигнала", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(api.signal).mockResolvedValue(signalFixture);
     vi.mocked(api.signalPatterns).mockResolvedValue([]);
     vi.mocked(api.signalDecisionHistory).mockResolvedValue({entity_type: "signal", entity_fingerprint: "f".repeat(64), current_status: null, history_found: false, events: []});
@@ -25,9 +26,10 @@ describe("пошаговая карточка сигнала", () => {
   it("отображает четыре этапа и одну закреплённую панель действий", async () => {
     render(<SignalPage/>);
     await screen.findByRole("heading", {name: "Компьютерная томография"});
-    for (const label of ["1. Сводка", "2. Обоснование", "3. Связанные записи", "4. Решение специалиста"]) {
-      expect(screen.getByRole("link", {name: label})).toBeInTheDocument();
+    for (const label of ["Сводка", "Обоснование", "Связи", "Решение"]) {
+      expect(screen.getByRole("link", {name: new RegExp(label)})).toBeInTheDocument();
     }
+    expect(screen.getByRole("link", {name: /Сводка/})).toHaveAttribute("aria-current", "step");
     expect(screen.getAllByLabelText("Действия специалиста")).toHaveLength(1);
     expect(screen.getByRole("link", {name: "Следующий"})).toHaveAttribute("href", expect.stringContaining("/signals/11"));
     expect(screen.getAllByText(/Фактор (риска|приоритета)/).length).toBeLessThanOrEqual(3);
@@ -39,7 +41,7 @@ describe("пошаговая карточка сигнала", () => {
     render(<SignalPage/>);
     await screen.findByRole("heading", {name: "Компьютерная томография"});
     fireEvent.click(screen.getByText("Другие действия"));
-    fireEvent.click(screen.getByRole("button", {name: "Подтвердить сигнал"}));
+    fireEvent.click(await screen.findByRole("menuitem", {name: "Подтвердить сигнал"}));
     fireEvent.change(screen.getByLabelText("Комментарий специалиста"), {target: {value: "Данные сопоставлены."}});
     fireEvent.click(screen.getByRole("button", {name: "Сохранить решение"}));
     await waitFor(() => expect(screen.getAllByText("Решение сохранено").length).toBeGreaterThan(0));
@@ -51,5 +53,29 @@ describe("пошаговая карточка сигнала", () => {
     vi.mocked(api.signalPatterns).mockResolvedValue([patternFixture]);
     render(<SignalPage/>);
     expect(await screen.findByRole("link", {name: /Повторяющаяся услуга: Холтеровское мониторирование/})).toHaveAttribute("href", "/patterns/7");
+  });
+
+  it("поддерживает клавиатурную навигацию этапов и сохраняет контекст возврата", async () => {
+    render(<SignalPage/>);
+    await screen.findByRole("heading", { name: "Компьютерная томография" });
+    const summary = screen.getByRole("link", { name: /Сводка/ });
+    summary.focus();
+    fireEvent.keyDown(summary, { key: "ArrowRight" });
+    expect(screen.getByRole("link", { name: /Обоснование/ })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "К разделу «Проверка»" })).toHaveAttribute("href", "/signals?priority_level=Высокий");
+  });
+
+  it("показывает detail skeleton во время загрузки", async () => {
+    vi.mocked(api.signal).mockImplementationOnce(() => new Promise(() => undefined));
+    render(<SignalPage/>);
+    expect(screen.getByLabelText("Загрузка данных")).toHaveAttribute("data-skeleton", "detail");
+    await waitFor(() => expect(api.signal).toHaveBeenCalled());
+  });
+
+  it("показывает понятную ошибку без технического текста", async () => {
+    vi.mocked(api.signal).mockRejectedValueOnce(new Error("stack trace: connection reset"));
+    render(<SignalPage/>);
+    expect(await screen.findByText("Сигнал недоступен")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Повторить" })).toBeInTheDocument();
   });
 });

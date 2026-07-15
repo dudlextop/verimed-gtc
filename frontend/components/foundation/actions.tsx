@@ -123,10 +123,13 @@ export interface OverflowActionsProps {
   label?: string;
   className?: string;
   disabled?: boolean;
+  compactOnMobile?: boolean;
+  iconOnly?: boolean;
+  placement?: "top" | "bottom";
   onActionError?: (message: string) => void;
 }
 
-export function OverflowActions({ items, label = "Другие действия", className, disabled = false, onActionError }: OverflowActionsProps) {
+export function OverflowActions({ items, label = "Другие действия", className, disabled = false, compactOnMobile = false, iconOnly = false, placement = "bottom", onActionError }: OverflowActionsProps) {
   const [open, setOpen] = React.useState(false);
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
   const menuId = React.useId();
@@ -193,7 +196,8 @@ export function OverflowActions({ items, label = "Другие действия"
         ref={triggerRef}
         type="button"
         variant="secondary"
-        size="compact"
+        size={iconOnly ? "icon" : "compact"}
+        className={compactOnMobile ? "max-sm:min-h-11 max-sm:min-w-11 max-sm:px-0" : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -211,7 +215,7 @@ export function OverflowActions({ items, label = "Другие действия"
         }}
       >
         <MoreVertical className="h-4 w-4" aria-hidden="true" />
-        {label}
+        <span className={iconOnly ? "sr-only" : compactOnMobile ? "max-sm:sr-only" : undefined}>{label}</span>
       </Button>
       {open && (
         <div
@@ -219,7 +223,7 @@ export function OverflowActions({ items, label = "Другие действия"
           role="menu"
           aria-label={label}
           onKeyDown={moveFocus}
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-56 rounded-v2-overlay border border-v2-border bg-v2-surface p-2 shadow-v2-dropdown"
+          className={cn("absolute right-0 z-50 min-w-56 rounded-v2-overlay border border-v2-border bg-v2-surface p-2 shadow-v2-dropdown", placement === "top" ? "bottom-[calc(100%+0.5rem)]" : "top-[calc(100%+0.5rem)]")}
         >
           {availableItems.map((item) => (
             <button

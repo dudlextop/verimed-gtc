@@ -5,9 +5,10 @@ import { ReviewActions, ReviewDialog } from "@/components/signal-review-controls
 describe("закреплённые действия", () => {
   it("показывает все доступные экспертные решения", () => {
     render(<ReviewActions currentStatus="Не проверено" onChoose={vi.fn()}/>);
-    expect(screen.getByRole("button", {name: "Подтвердить сигнал"})).toBeInTheDocument();
-    expect(screen.getByRole("button", {name: "Отклонить сигнал"})).toBeInTheDocument();
     expect(screen.getByRole("button", {name: "Направить на углублённую проверку"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Другие действия"}));
+    expect(screen.getByRole("menuitem", {name: "Подтвердить сигнал"})).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", {name: "Отклонить сигнал"})).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: "Добавить комментарий"})).not.toBeInTheDocument();
   });
 

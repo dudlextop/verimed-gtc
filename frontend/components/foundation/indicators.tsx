@@ -32,7 +32,7 @@ export function DomainIndicator({ kind, level, value, label, compact = false, cl
   const style = levelStyle(level);
   if (kind === "reviewStatus") {
     return (
-      <span data-domain-indicator="reviewStatus" className={cn("inline-flex min-h-7 max-w-64 items-center gap-2 rounded-full border border-v2-border bg-v2-surface-soft px-2.5 text-xs font-semibold text-v2-text-secondary", className)}>
+      <span data-domain-indicator="reviewStatus" className={cn("inline-flex min-h-7 max-w-full items-center gap-2 rounded-full border border-v2-border bg-v2-surface-soft px-2.5 text-xs font-semibold text-v2-text-secondary", className)}>
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-v2-text-muted" aria-hidden="true" />
         <span className="truncate">{label ?? level}</span>
       </span>
@@ -70,17 +70,22 @@ export function DomainIndicator({ kind, level, value, label, compact = false, cl
   }
 
   return (
-    <span data-domain-indicator="priority" className={cn("inline-flex min-h-8 items-center gap-2 rounded-v2-control px-2.5 text-xs font-bold", style.soft, style.text, className)}>
+    <span data-domain-indicator="priority" className={cn("inline-flex min-h-8 items-center gap-2 rounded-v2-control px-2.5 text-xs font-bold", compact && "max-w-full gap-1.5 px-2", style.soft, style.text, className)}>
       <span className={cn("h-2 w-2 shrink-0 rounded-full", style.marker)} aria-hidden="true" />
-      <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+      {!compact && <Flag className="h-3.5 w-3.5" aria-hidden="true" />}
       {value !== undefined && <strong className="v2-tabular text-lg leading-none text-v2-text">{value}</strong>}
-      <span>{label ?? (compact ? level : `Приоритет: ${level}`)}</span>
+      <span className={compact ? "truncate" : undefined}>{label ?? (compact ? level : `Приоритет: ${level}`)}</span>
     </span>
   );
 }
 
 export function FinancialValue({ value, label, compact = false, leading = false, className }: { value: string | number; label?: string; compact?: boolean; leading?: boolean; className?: string }) {
-  const displayValue = typeof value === "number" ? money(value, compact) : value;
+  const numericValue = typeof value === "number"
+    ? value
+    : /^\s*-?\d+(?:\.\d+)?\s*$/.test(value)
+      ? Number(value)
+      : null;
+  const displayValue = numericValue === null ? value : money(numericValue, compact);
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2 text-v2-teal-text", className)}>
       <CircleDollarSign className={cn("shrink-0", leading ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 export interface DataTableColumn {
   id: string;
   label: string;
+  header?: React.ReactNode;
   align?: "left" | "center" | "right";
   sortable?: boolean;
   sortDirection?: "ascending" | "descending";
@@ -24,8 +25,8 @@ export interface DataTableShellProps {
 export function DataTableShell({ columns, children, mobileContent, caption, className, tableClassName }: DataTableShellProps) {
   return (
     <div className={cn("min-w-0", className)}>
-      {mobileContent && <div className="space-y-3 md:hidden">{mobileContent}</div>}
-      <div className={cn("overflow-x-auto rounded-v2-section border border-v2-border bg-v2-surface", mobileContent && "hidden md:block")}>
+      {mobileContent && <div className="space-y-3 lg:hidden">{mobileContent}</div>}
+      <div className={cn("overflow-x-auto rounded-v2-section border border-v2-border bg-v2-surface", mobileContent && "hidden lg:block")}>
         <table className={cn("v2-data-table w-full min-w-[42rem] border-separate border-spacing-0", tableClassName)}>
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead className="sticky top-0 z-10 bg-v2-surface-soft">
@@ -57,7 +58,7 @@ export function DataTableShell({ columns, children, mobileContent, caption, clas
                         {column.label}
                         <SortIcon className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
-                    ) : column.label}
+                    ) : column.header ?? column.label}
                   </th>
                 );
               })}
