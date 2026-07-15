@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import DecisionEntityType, PatternReviewStatus, ReviewStatus, RiskLevel
 
@@ -711,6 +711,42 @@ class PatternTypeDistribution(ApiModel):
     percent: float
 
 
+class RegionalLeadingOrganization(ApiModel):
+    id: int
+    name: str
+    priority_score: int
+
+
+class RegionalMonitoringItem(ApiModel):
+    region_name: str
+    region_code: str
+    signal_count: int
+    unique_record_count: int
+    financial_significance: Decimal
+    organization_count: int
+    maximum_priority: int
+    leading_organization: RegionalLeadingOrganization | None = None
+
+
+StrictSignalId = Annotated[int, Field(strict=True, gt=0)]
+
+
+class SignalExportSelection(ApiModel):
+    signal_ids: list[StrictSignalId] = Field(max_length=1000)
+
+    @field_validator("signal_ids", mode="before")
+    @classmethod
+    def require_signal_ids(cls, value: object) -> object:
+        if not isinstance(value, list) or not value:
+            raise ValueError("Выберите хотя бы один сигнал")
+        return value
+
+    @field_validator("signal_ids")
+    @classmethod
+    def deduplicate_signal_ids(cls, value: list[int]) -> list[int]:
+        return list(dict.fromkeys(value))
+
+
 class HomeAnalytics(ApiModel):
     schema_version: int
     summary: AnalyticsSummary
@@ -736,6 +772,8 @@ class OverviewAnalytics(ApiModel):
     pattern_distribution: list[PatternTypeDistribution]
     quality: AnalysisMetricItem
     expert_review: ExpertReviewSummary
+    timeline: list[TimelinePoint] = Field(default_factory=list)
+    regional_monitoring: list[RegionalMonitoringItem] = Field(default_factory=list)
 
 
 OrganizationDetail.model_rebuild()

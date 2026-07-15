@@ -1,6 +1,6 @@
 import type { AnalysisMetric, AnalysisMetricByType, AnalyticsChanges, AnalyticsSummary, CommandCenter, DecisionEvent, DecisionHistory, DecisionJournalResponse, DistributionPoint, ExpertFeedback, ExpertReviewBreakdown, ExpertReviewSummary, FinancialImpact, FinancialImpactSummary, Finding, HomeAnalytics, IntegrityCheck, Methodology, OrganizationComparison, OrganizationDetail, OrganizationsResponse, OverviewAnalytics, PatternChanges, PatternDetail, PatternGraph, PatternsResponse, PatternReviewStatus, PatternSummary, PatternTimelinePoint, PriorityHistoryPoint, PrioritySummary, RecurrenceHistory, RecurringPattern, Signal, SignalDetail, SignalPreview, SignalsResponse, TimelinePoint, ReviewStatus } from "./types";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
 type RequestOptions = { ttlMs?: number; abortKey?: string };
 type CachedResponse = { expiresAt: number; value: unknown };
 const responseCache = new Map<string, CachedResponse>();

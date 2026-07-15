@@ -1,8 +1,10 @@
 from collections import Counter
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import (
     AnalysisRun,
@@ -90,6 +92,7 @@ def list_organizations(
     risk_level: str | None,
     status: str | None,
     sort: str,
+    direction: str | None = None,
 ) -> PaginatedOrganizations:
     query = select(MedicalOrganization)
     count_query = select(func.count(MedicalOrganization.id))
@@ -119,6 +122,8 @@ def list_organizations(
     query = query.where(*filters)
     count_query = count_query.where(*filters)
     latest_run_id = db.scalar(select(func.max(AnalysisRun.id)))
+    descending = direction == "desc" if direction is not None else sort != "name"
+    order: ColumnElement[Any]
     if sort in {"priority", "financial"} and latest_run_id is not None:
         query = query.outerjoin(
             OrganizationPrioritySnapshot,
@@ -127,17 +132,33 @@ def list_organizations(
                 OrganizationPrioritySnapshot.analysis_run_id == latest_run_id,
             ),
         )
-        query = query.order_by(
-            OrganizationPrioritySnapshot.financial_significance.desc()
-            if sort == "financial"
-            else OrganizationPrioritySnapshot.score.desc()
-        )
+        if sort == "financial":
+            order = (
+                OrganizationPrioritySnapshot.financial_significance.desc()
+                if descending
+                else OrganizationPrioritySnapshot.financial_significance.asc()
+            )
+        else:
+            order = (
+                OrganizationPrioritySnapshot.score.desc()
+                if descending
+                else OrganizationPrioritySnapshot.score.asc()
+            )
     else:
-        query = query.order_by(
-            MedicalOrganization.name.asc()
-            if sort == "name"
-            else MedicalOrganization.risk_score.desc()
-        )
+        if sort == "name":
+            order = (
+                MedicalOrganization.name.desc()
+                if descending
+                else MedicalOrganization.name.asc()
+            )
+        else:
+            order = (
+                MedicalOrganization.risk_score.desc()
+                if descending
+                else MedicalOrganization.risk_score.asc()
+            )
+    stable_order = MedicalOrganization.id.desc() if descending else MedicalOrganization.id.asc()
+    query = query.order_by(order, stable_order)
     orgs = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
     organization_ids = [organization.id for organization in orgs]
     record_stats = {

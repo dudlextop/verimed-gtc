@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   Button,
@@ -95,5 +95,41 @@ describe("foundation Verimed V2", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveFocus();
+  });
+
+  it("переводит фокус в overflow-меню и перемещает его стрелками", async () => {
+    render(<OverflowActions items={[
+      { id: "comment", label: "Добавить комментарий", onSelect: vi.fn() },
+      { id: "history", label: "Открыть историю", onSelect: vi.fn() },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Другие действия" }));
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "Добавить комментарий" })).toHaveFocus());
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "ArrowDown" });
+    expect(screen.getByRole("menuitem", { name: "Открыть историю" })).toHaveFocus();
+  });
+
+  it("скрывает неработающие overflow-пункты и выполняет async action", async () => {
+    let resolveAction: (() => void) | undefined;
+    const action = vi.fn(() => new Promise<void>((resolve) => { resolveAction = resolve; }));
+    render(<OverflowActions items={[
+      { id: "working", label: "Рабочее действие", onSelect: action },
+      { id: "placeholder", label: "Неработающая заглушка" },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Другие действия" }));
+    expect(screen.queryByText("Неработающая заглушка")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Рабочее действие" }));
+    expect(screen.getByRole("menuitem", { name: "Рабочее действие" })).toHaveAttribute("aria-busy", "true");
+    resolveAction?.();
+    await waitFor(() => expect(screen.queryByRole("menu")).not.toBeInTheDocument());
+    expect(action).toHaveBeenCalledOnce();
+  });
+
+  it("управляет состояниями ExportAction для async callback", async () => {
+    let resolveAction: (() => void) | undefined;
+    render(<ExportAction scopeLabel="Текущая выборка" onAction={() => new Promise<void>((resolve) => { resolveAction = resolve; })} />);
+    fireEvent.click(screen.getByRole("button", { name: /Экспортировать/ }));
+    expect(screen.getByRole("button", { name: "Подготовка…" })).toBeDisabled();
+    resolveAction?.();
+    await screen.findByRole("button", { name: "Экспорт подготовлен" });
   });
 });

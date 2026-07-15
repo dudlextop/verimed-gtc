@@ -1,11 +1,13 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "@/components/sidebar";
+import { saveLocalProfile } from "@/lib/local-profile";
 
 let pathname = "/signals";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 describe("оболочка навигации", () => {
+  beforeEach(() => localStorage.clear());
   it("сохраняет структуру и отмечает активный маршрут", () => {
     pathname = "/signals/840";
     render(<Sidebar />);
@@ -74,5 +76,12 @@ describe("оболочка навигации", () => {
     fireEvent.keyDown(document, { key: "Tab" });
     expect(logoLink).toHaveFocus();
     expect(closeButton).not.toHaveFocus();
+  });
+
+  it("читает локальное имя и инициалы без изменения fallback-профиля", async () => {
+    saveLocalProfile({ displayName: "Эксперт Verimed", jobTitle: "Специалист", initials: "ЭВ" });
+    render(<Sidebar />);
+    await waitFor(() => expect(screen.getAllByRole("link", { name: /Эксперт Verimed/ }).length).toBeGreaterThan(0));
+    expect(screen.getAllByText("ЭВ").length).toBeGreaterThan(0);
   });
 });

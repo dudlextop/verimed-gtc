@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db, showcase_snapshot_path, storage_mode
@@ -52,6 +54,7 @@ from app.schemas import (
     RecurrenceHistory,
     ReviewCreate,
     SignalDetail,
+    SignalExportSelection,
     SignalListItem,
     SignalPreview,
     TimelinePoint,
@@ -76,6 +79,13 @@ from app.services.expert_decisions import (
     pattern_recurrence,
     signal_recurrence,
     verify_integrity,
+)
+from app.services.exports import (
+    ExportLimitExceeded,
+    ExportSelectionMissing,
+    export_organizations,
+    export_selected_signals,
+    export_signals,
 )
 from app.services.financial_priority import (
     get_financial_impact_summary,
@@ -116,6 +126,40 @@ def regenerate_and_run(db: Session, seed: int) -> AnalysisExecution:
 
     return execute(db, seed)
 Db = Annotated[Session, Depends(get_db)]
+
+
+def _csv_response(content: Iterator[str], filename: str, row_count: int) -> StreamingResponse:
+    return StreamingResponse(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Export-Rows": str(row_count),
+        },
+    )
+
+
+def _raise_export_error(error: ExportLimitExceeded | ExportSelectionMissing) -> NoReturn:
+    if isinstance(error, ExportLimitExceeded):
+        raise HTTPException(
+            413,
+            {
+                "code": "export_limit_exceeded",
+                "message": (
+                    f"В выборке {error.total} строк. Сузьте фильтры до {error.limit} строк."
+                ),
+                "limit": error.limit,
+                "total": error.total,
+            },
+        ) from error
+    raise HTTPException(
+        404,
+        {
+            "code": "signals_not_found",
+            "message": "Часть выбранных сигналов не найдена. Обновите выборку.",
+            "missing_ids": list(error.missing_ids),
+        },
+    ) from error
 
 
 @router.get("/health", response_model=HealthStatus)
@@ -264,6 +308,89 @@ def decision_journal_event(event_id: int, db: Db) -> DecisionEventItem:
     return result
 
 
+@router.get("/exports/signals.csv")
+def signals_csv_export(
+    db: Db,
+    search: str | None = None,
+    level: str | None = None,
+    levels: Annotated[list[str] | None, Query()] = None,
+    organization_id: int | None = None,
+    region: str | None = None,
+    anomaly_type: str | None = None,
+    status: str | None = None,
+    priority_level: str | None = None,
+    financial_min: Annotated[Decimal | None, Query(ge=0)] = None,
+    financial_max: Annotated[Decimal | None, Query(ge=0)] = None,
+    has_decision: bool | None = None,
+    period_months: int | None = Query(None, ge=1, le=6),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort: str = "priority",
+    direction: str | None = Query(None, pattern="^(asc|desc)$"),
+) -> StreamingResponse:
+    try:
+        content, row_count = export_signals(
+            db,
+            level=level,
+            levels=levels,
+            organization_id=organization_id,
+            region=region,
+            anomaly_type=anomaly_type,
+            status=status,
+            priority_level=priority_level,
+            financial_min=financial_min,
+            financial_max=financial_max,
+            has_decision=has_decision,
+            period_months=period_months,
+            search=search,
+            date_from=date_from,
+            date_to=date_to,
+            sort=sort,
+            direction=direction,
+        )
+    except (ExportLimitExceeded, ExportSelectionMissing) as error:
+        _raise_export_error(error)
+    return _csv_response(content, "verimed-signals.csv", row_count)
+
+
+@router.post("/exports/signals.csv")
+def selected_signals_csv_export(
+    payload: SignalExportSelection, db: Db
+) -> StreamingResponse:
+    try:
+        content, row_count = export_selected_signals(db, payload.signal_ids)
+    except (ExportLimitExceeded, ExportSelectionMissing) as error:
+        _raise_export_error(error)
+    return _csv_response(content, "verimed-selected-signals.csv", row_count)
+
+
+@router.get("/exports/organizations.csv")
+def organizations_csv_export(
+    db: Db,
+    search: str | None = None,
+    region: str | None = None,
+    organization_type: str | None = None,
+    risk_level: str | None = None,
+    status: str | None = None,
+    sort: str = "risk",
+    direction: str | None = Query(None, pattern="^(asc|desc)$"),
+) -> StreamingResponse:
+    try:
+        content, row_count = export_organizations(
+            db,
+            search=search,
+            region=region,
+            organization_type=organization_type,
+            risk_level=risk_level,
+            status=status,
+            sort=sort,
+            direction=direction,
+        )
+    except (ExportLimitExceeded, ExportSelectionMissing) as error:
+        _raise_export_error(error)
+    return _csv_response(content, "verimed-organizations.csv", row_count)
+
+
 @router.get("/organizations", response_model=PaginatedOrganizations)
 def organizations(
     db: Db,
@@ -275,9 +402,19 @@ def organizations(
     risk_level: str | None = None,
     status: str | None = None,
     sort: str = "risk",
+    direction: str | None = Query(None, pattern="^(asc|desc)$"),
 ) -> PaginatedOrganizations:
     return list_organizations(
-        db, page, page_size, search, region, organization_type, risk_level, status, sort
+        db,
+        page,
+        page_size,
+        search,
+        region,
+        organization_type,
+        risk_level,
+        status,
+        sort,
+        direction,
     )
 
 
@@ -327,6 +464,7 @@ def signals(
     db: Db,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    search: str | None = None,
     level: str | None = None,
     levels: Annotated[list[str] | None, Query()] = None,
     organization_id: int | None = None,
@@ -338,7 +476,10 @@ def signals(
     financial_max: Annotated[Decimal | None, Query(ge=0)] = None,
     has_decision: bool | None = None,
     period_months: int | None = Query(None, ge=1, le=6),
+    date_from: date | None = None,
+    date_to: date | None = None,
     sort: str = "priority",
+    direction: str | None = Query(None, pattern="^(asc|desc)$"),
 ) -> PaginatedSignals:
     return list_signals(
         db,
@@ -356,6 +497,10 @@ def signals(
         financial_max,
         has_decision,
         period_months,
+        search,
+        date_from,
+        date_to,
+        direction,
     )
 
 

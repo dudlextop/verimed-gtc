@@ -55,7 +55,7 @@ export type ExportActionState = "idle" | "loading" | "success" | "error" | "disa
 export interface ExportActionProps {
   state?: ExportActionState;
   scopeLabel?: string;
-  onAction?: () => void;
+  onAction?: () => void | Promise<void>;
   className?: string;
   message?: string;
 }
@@ -68,20 +68,40 @@ const exportLabels: Record<ExportActionState, string> = {
   disabled: "Экспорт недоступен",
 };
 
-export function ExportAction({ state = "idle", scopeLabel, onAction, className, message }: ExportActionProps) {
-  const disabled = state === "disabled" || state === "loading";
-  const Icon = state === "loading" ? LoaderCircle : state === "success" ? CheckCircle2 : state === "error" ? AlertCircle : Download;
-  const feedback = message ?? (state === "error" ? "Не удалось подготовить файл." : state === "success" ? "Файл готов к сохранению." : undefined);
+export function ExportAction({ state, scopeLabel, onAction, className, message }: ExportActionProps) {
+  const [internalState, setInternalState] = React.useState<ExportActionState>("idle");
+  const [internalMessage, setInternalMessage] = React.useState<string>();
+  const resolvedState = state ?? internalState;
+  const disabled = resolvedState === "disabled" || resolvedState === "loading";
+  const Icon = resolvedState === "loading" ? LoaderCircle : resolvedState === "success" ? CheckCircle2 : resolvedState === "error" ? AlertCircle : Download;
+  const feedback = message ?? internalMessage ?? (resolvedState === "error" ? "Не удалось подготовить файл." : resolvedState === "success" ? "Файл готов к сохранению." : undefined);
+
+  const runAction = async () => {
+    if (!onAction) return;
+    if (state === undefined) {
+      setInternalState("loading");
+      setInternalMessage(undefined);
+    }
+    try {
+      await onAction();
+      if (state === undefined) setInternalState("success");
+    } catch (error) {
+      if (state === undefined) {
+        setInternalState("error");
+        setInternalMessage(error instanceof Error ? error.message : "Не удалось подготовить файл.");
+      }
+    }
+  };
 
   return (
     <div className={cn("inline-flex min-w-0 flex-col items-start gap-1", className)}>
-      <Button type="button" variant="secondary" size="compact" disabled={disabled} loading={state === "loading"} onClick={onAction}>
-        {state !== "loading" && <Icon className="h-4 w-4" aria-hidden="true" />}
-        <span>{exportLabels[state]}</span>
-        {scopeLabel && state === "idle" && <span className="font-normal text-v2-text-secondary">· {scopeLabel}</span>}
+      <Button type="button" variant="secondary" size="compact" disabled={disabled} loading={resolvedState === "loading"} onClick={() => void runAction()}>
+        {resolvedState !== "loading" && <Icon className="h-4 w-4" aria-hidden="true" />}
+        <span>{exportLabels[resolvedState]}</span>
+        {scopeLabel && resolvedState === "idle" && <span className="font-normal text-v2-text-secondary">· {scopeLabel}</span>}
       </Button>
       {feedback && (
-        <span className={cn("text-xs", state === "error" ? "text-v2-critical-text" : "text-v2-text-secondary")} role={state === "error" ? "alert" : "status"}>
+        <span className={cn("text-xs", resolvedState === "error" ? "text-v2-critical-text" : "text-v2-text-secondary")} role={resolvedState === "error" ? "alert" : "status"}>
           {feedback}
         </span>
       )}
@@ -92,20 +112,32 @@ export function ExportAction({ state = "idle", scopeLabel, onAction, className, 
 export interface OverflowActionItem {
   id: string;
   label: string;
-  onSelect: () => void;
+  onSelect?: () => void | Promise<void>;
   icon?: React.ReactNode;
   disabled?: boolean;
   destructive?: boolean;
 }
 
-export function OverflowActions({ items, label = "Другие действия", className }: { items: OverflowActionItem[]; label?: string; className?: string }) {
+export interface OverflowActionsProps {
+  items: OverflowActionItem[];
+  label?: string;
+  className?: string;
+  disabled?: boolean;
+  onActionError?: (message: string) => void;
+}
+
+export function OverflowActions({ items, label = "Другие действия", className, disabled = false, onActionError }: OverflowActionsProps) {
   const [open, setOpen] = React.useState(false);
+  const [loadingId, setLoadingId] = React.useState<string | null>(null);
   const menuId = React.useId();
   const rootRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
     if (!open) return;
+    const focusFrame = window.requestAnimationFrame(() => {
+      rootRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
+    });
     const close = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -118,21 +150,41 @@ export function OverflowActions({ items, label = "Другие действия"
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", escape);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
 
-  if (!items.length) return null;
+  const availableItems = items.filter((item) => item.onSelect && !item.disabled);
+  if (!availableItems.length) return null;
 
   const moveFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
     if (!actions.length) return;
     const current = actions.indexOf(document.activeElement as HTMLButtonElement);
-    const direction = event.key === "ArrowDown" ? 1 : -1;
-    actions[(current + direction + actions.length) % actions.length]?.focus();
+    if (event.key === "Home") actions[0]?.focus();
+    else if (event.key === "End") actions.at(-1)?.focus();
+    else {
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      actions[(current + direction + actions.length) % actions.length]?.focus();
+    }
+  };
+
+  const runItem = async (item: OverflowActionItem) => {
+    if (!item.onSelect) return;
+    setLoadingId(item.id);
+    try {
+      await item.onSelect();
+      setOpen(false);
+      triggerRef.current?.focus();
+    } catch (error) {
+      onActionError?.(error instanceof Error ? error.message : "Не удалось выполнить действие");
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
@@ -145,7 +197,18 @@ export function OverflowActions({ items, label = "Другие действия"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
+        disabled={disabled || loadingId !== null}
         onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !open) {
+            event.preventDefault();
+            setOpen(true);
+            window.requestAnimationFrame(() => {
+              const actions = rootRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']");
+              (event.key === "ArrowDown" ? actions?.[0] : actions?.[actions.length - 1])?.focus();
+            });
+          }
+        }}
       >
         <MoreVertical className="h-4 w-4" aria-hidden="true" />
         {label}
@@ -158,17 +221,14 @@ export function OverflowActions({ items, label = "Другие действия"
           onKeyDown={moveFocus}
           className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-56 rounded-v2-overlay border border-v2-border bg-v2-surface p-2 shadow-v2-dropdown"
         >
-          {items.map((item) => (
+          {availableItems.map((item) => (
             <button
               key={item.id}
               type="button"
               role="menuitem"
-              disabled={item.disabled}
-              onClick={() => {
-                item.onSelect();
-                setOpen(false);
-                triggerRef.current?.focus();
-              }}
+              disabled={loadingId !== null}
+              aria-busy={loadingId === item.id || undefined}
+              onClick={() => void runItem(item)}
               className={cn(
                 "flex min-h-10 w-full items-center gap-2 rounded-v2-control px-3 py-2 text-left text-sm font-medium max-sm:min-h-11",
                 "transition-colors duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary motion-reduce:transition-none",
@@ -176,7 +236,7 @@ export function OverflowActions({ items, label = "Другие действия"
                 item.destructive ? "text-v2-critical-text hover:bg-v2-critical-soft" : "text-v2-text hover:bg-v2-surface-soft",
               )}
             >
-              {item.icon && <span aria-hidden="true">{item.icon}</span>}
+              {loadingId === item.id ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : item.icon && <span aria-hidden="true">{item.icon}</span>}
               {item.label}
             </button>
           ))}

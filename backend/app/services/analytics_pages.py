@@ -21,6 +21,7 @@ from app.services.expert_decisions import expert_review_summary
 from app.services.financial_priority import get_priority_summary
 from app.services.organizations import list_organizations
 from app.services.recurring_patterns import PATTERN_TYPES, pattern_changes, pattern_summary
+from app.services.regional_monitoring import get_regional_monitoring
 from app.services.runtime_cache import cached_result
 
 
@@ -78,7 +79,7 @@ def get_home_analytics(db: Session) -> HomeAnalytics:
 def get_overview_analytics(db: Session) -> OverviewAnalytics:
     def build() -> OverviewAnalytics:
         return OverviewAnalytics(
-            schema_version=1,
+            schema_version=2,
             summary=get_summary(db),
             command_center=get_command_center(db),
             changes=get_changes(db),
@@ -88,6 +89,8 @@ def get_overview_analytics(db: Session) -> OverviewAnalytics:
             pattern_distribution=_pattern_distribution(db),
             quality=_quality(db),
             expert_review=expert_review_summary(db),
+            timeline=get_timeline(db),
+            regional_monitoring=get_regional_monitoring(db),
         )
 
     return cached_result(_cache_key(db, "overview"), build)

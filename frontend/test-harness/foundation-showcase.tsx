@@ -29,6 +29,7 @@ import {
   StickyActionBar,
   Textarea,
 } from "@/components/foundation";
+import { DataActionsShowcase } from "@/test-harness/data-actions-showcase";
 
 const columns = [
   { id: "priority", label: "Приоритет", sortable: true, sortDirection: "descending" as const },
@@ -163,6 +164,8 @@ export function FoundationShowcase() {
         <SectionHeader id="skeleton-title" title="Skeleton геометрия" description="Варианты повторяют структуру будущих страниц и учитывают reduced motion." />
         <DataPanel><PageSkeleton variant="list" /></DataPanel>
       </section>
+
+      <DataActionsShowcase />
 
       <StickyActionBar
         secondaryActions={<Button variant="secondary" onClick={() => setMessage("Черновик сохранён")}>Сохранить черновик</Button>}

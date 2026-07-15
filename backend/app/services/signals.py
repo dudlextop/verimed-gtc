@@ -1,13 +1,16 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import (
     DecisionEntityType,
     MedicalOrganization,
     MedicalRecord,
+    MedicalService,
     ReviewPriority,
     ReviewStatus,
     RiskSignal,
@@ -81,12 +84,37 @@ def list_signals(
     financial_max: Decimal | None = None,
     has_decision: bool | None = None,
     period_months: int | None = None,
+    search: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    direction: str | None = None,
 ) -> PaginatedSignals:
-    query = select(RiskSignal).outerjoin(ReviewPriority).options(*SIGNAL_OPTIONS)
+    query = (
+        select(RiskSignal)
+        .join(MedicalOrganization)
+        .join(MedicalRecord, RiskSignal.medical_record_id == MedicalRecord.id)
+        .outerjoin(ReviewPriority)
+        .options(*SIGNAL_OPTIONS)
+    )
     count_query = (
-        select(func.count(RiskSignal.id)).join(MedicalOrganization).outerjoin(ReviewPriority)
+        select(func.count(RiskSignal.id))
+        .join(MedicalOrganization)
+        .join(MedicalRecord, RiskSignal.medical_record_id == MedicalRecord.id)
+        .outerjoin(ReviewPriority)
     )
     filters = []
+    if search:
+        query = query.join(MedicalService, MedicalRecord.service_id == MedicalService.id)
+        count_query = count_query.join(
+            MedicalService, MedicalRecord.service_id == MedicalService.id
+        )
+        filters.append(
+            or_(
+                MedicalOrganization.name.ilike(f"%{search}%"),
+                MedicalService.name.ilike(f"%{search}%"),
+                RiskSignal.primary_reason.ilike(f"%{search}%"),
+            )
+        )
     if level:
         filters.append(RiskSignal.level == level)
     if levels:
@@ -119,26 +147,36 @@ def list_signals(
                 MedicalRecord.service_date
                 >= latest_record_date - timedelta(days=period_months * 30)
             )
-        query = query.join(MedicalRecord, RiskSignal.medical_record_id == MedicalRecord.id)
-        count_query = count_query.join(
-            MedicalRecord, RiskSignal.medical_record_id == MedicalRecord.id
-        )
-    if region:
-        query = query.join(MedicalOrganization)
+    if date_from is not None:
+        filters.append(MedicalRecord.service_date >= date_from)
+    if date_to is not None:
+        filters.append(MedicalRecord.service_date <= date_to)
     query = query.where(*filters)
     count_query = count_query.where(*filters)
+    descending = direction == "desc" if direction is not None else sort != "organization"
+    order: ColumnElement[Any]
     if sort == "date":
-        query = query.order_by(RiskSignal.created_at.desc())
+        order = (
+            MedicalRecord.service_date.desc()
+            if descending
+            else MedicalRecord.service_date.asc()
+        )
     elif sort in {"risk", "score"}:
-        query = query.order_by(RiskSignal.score.desc())
+        order = RiskSignal.score.desc() if descending else RiskSignal.score.asc()
     elif sort == "financial":
-        query = query.order_by(ReviewPriority.financial_significance.desc())
+        order = (
+            ReviewPriority.financial_significance.desc()
+            if descending
+            else ReviewPriority.financial_significance.asc()
+        )
     elif sort == "organization":
-        query = query.order_by(MedicalOrganization.name.asc())
+        order = (
+            MedicalOrganization.name.desc() if descending else MedicalOrganization.name.asc()
+        )
     else:
-        query = query.order_by(ReviewPriority.score.desc())
-    if sort == "organization" and not region:
-        query = query.join(MedicalOrganization)
+        order = ReviewPriority.score.desc() if descending else ReviewPriority.score.asc()
+    stable_order = RiskSignal.id.desc() if descending else RiskSignal.id.asc()
+    query = query.order_by(order, stable_order)
     signals = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
     anomaly_types = [
         ANOMALY_LABELS.get(item, item)

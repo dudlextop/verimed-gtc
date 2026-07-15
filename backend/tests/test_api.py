@@ -31,7 +31,8 @@ def test_page_aggregates_are_compact_and_consistent(client: TestClient) -> None:
     assert home.status_code == overview.status_code == 200
     home_payload = home.json()
     overview_payload = overview.json()
-    assert home_payload["schema_version"] == overview_payload["schema_version"] == 1
+    assert home_payload["schema_version"] == 1
+    assert overview_payload["schema_version"] == 2
     assert home_payload["summary"] == overview_payload["summary"]
     assert home_payload["command_center"] == overview_payload["command_center"]
     assert overview_payload["pattern_distribution"]

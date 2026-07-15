@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandLogo } from "@/components/foundation";
+import { useLocalProfile } from "@/hooks/use-local-profile";
 import { cn } from "@/lib/utils";
 
 type NavigationItem = readonly [href: string, label: string, icon: LucideIcon];
@@ -83,6 +84,7 @@ function NavigationLink({ item, pathname, onNavigate }: { item: NavigationItem; 
 
 function ProfileTrigger({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const active = isActiveRoute(pathname, "/profile");
+  const { profile, source } = useLocalProfile();
 
   return (
     <Link
@@ -99,11 +101,15 @@ function ProfileTrigger({ pathname, onNavigate }: { pathname: string; onNavigate
     >
       {active && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-v2-primary" aria-hidden="true" />}
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-v2-control bg-v2-primary-soft text-v2-primary">
-        <CircleUserRound className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+        {source === "local" ? (
+          <span className="text-xs font-bold" aria-hidden="true">{profile.initials}</span>
+        ) : (
+          <CircleUserRound className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+        )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold leading-5 text-v2-text">Айдана Сарсенова</span>
-        <span className="block truncate text-xs leading-5 text-v2-text-secondary">Ведущий эксперт</span>
+        <span className="block truncate text-sm font-semibold leading-5 text-v2-text">{profile.displayName}</span>
+        <span className="block truncate text-xs leading-5 text-v2-text-secondary">{profile.jobTitle || profile.department}</span>
       </span>
     </Link>
   );
