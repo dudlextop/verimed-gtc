@@ -37,6 +37,28 @@ VERIMED_VISUAL_OUTPUT=/tmp/verimed-foundation npm run visual:foundation
 
 15 июля 2026 года foundation-матрица успешно создала 30 снимков. Дополнительно проверены 200% device scale, `prefers-reduced-motion`, мобильные touch targets, отсутствие горизонтального переполнения и ошибок браузерной консоли.
 
+## Shell V2
+
+Для оболочки существует отдельная матрица из пяти маршрутов и четырёх ширин:
+
+```bash
+cd frontend
+VERIMED_VISUAL_OUTPUT=/tmp/verimed-v2-shell npm run visual:shell
+```
+
+Маршруты: `/`, `/signals`, `/organizations`, `/patterns`, `/profile`. Ширины: 1440, 1280, 768 и 375 px. Команда создаёт 20 закрытых состояний и не включает `/overview`, потому что обзор использует отдельную оболочку.
+
+Дополнительная интерактивная проверка выполняется для sheet:
+
+- 768 px: закрытое и открытое меню;
+- 375 px: закрытое и открытое меню;
+- Escape, focus trap и возврат фокуса;
+- блокировка прокрутки фона;
+- 200% zoom и `prefers-reduced-motion`;
+- `scrollWidth === innerWidth` на рабочих маршрутах.
+
+15 июля 2026 года production-матрица создала 20 маршрутных снимков и 5 интерактивных снимков shell. Проверены реальные API-данные, открытые и закрытые состояния sheet, эквивалент 200% zoom, Escape, focus trap, return focus и отсутствие document overflow.
+
 ## Матрица
 
 Ширины: 1440, 768 и 375 px. Матрица содержит 27 снимков: девять маршрутов на трёх ширинах.

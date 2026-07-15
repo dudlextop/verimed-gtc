@@ -16,6 +16,8 @@ describe("оболочка приложения", () => {
     pathname = "/signals";
     rerender(<AppShell><div>Проверка</div></AppShell>);
     expect(screen.getByText("Боковая навигация")).toBeInTheDocument();
-    expect(screen.getByRole("main")).toHaveClass("lg:ml-[17rem]");
+    expect(screen.getByRole("main")).toHaveClass("xl:ml-[16.5rem]");
+    expect(screen.getByRole("link", {name: "К основному содержанию"})).toHaveAttribute("href", "#main-content");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
   });
 });

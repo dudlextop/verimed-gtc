@@ -7,7 +7,8 @@ const baseUrl = process.env.VERIMED_BASE_URL ?? "http://127.0.0.1:3000";
 const apiUrl = process.env.VERIMED_API_URL ?? "http://127.0.0.1:8000/api";
 const output = process.env.VERIMED_VISUAL_OUTPUT ?? join(tmpdir(), "verimed-visuals");
 const includeFoundation = process.env.VERIMED_INCLUDE_FOUNDATION === "true" || process.argv.includes("--foundation");
-const widths = [1440, 768, 375];
+const shellOnly = process.argv.includes("--shell");
+const widths = shellOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -31,24 +32,35 @@ async function firstId(endpoint) {
   return item.id;
 }
 
-const [signalId, organizationId, patternId] = await Promise.all([
-  firstId("/signals?sort=priority&page_size=1"),
-  firstId("/organizations?sort=priority&page_size=1"),
-  firstId("/patterns?sort=importance&page_size=1"),
-]);
+let pages;
+if (shellOnly) {
+  pages = [
+    ["shell-analytics", "/"],
+    ["shell-signals", "/signals?sort=priority"],
+    ["shell-organizations", "/organizations"],
+    ["shell-patterns", "/patterns?sort=importance"],
+    ["shell-profile", "/profile"],
+  ];
+} else {
+  const [signalId, organizationId, patternId] = await Promise.all([
+    firstId("/signals?sort=priority&page_size=1"),
+    firstId("/organizations?sort=priority&page_size=1"),
+    firstId("/patterns?sort=importance&page_size=1"),
+  ]);
 
-const pages = [
-  ["analytics", "/"],
-  ["analytics-overview", "/overview"],
-  ["signals", "/signals?sort=priority"],
-  ["signal-preview", `/signals?sort=priority&signal=${signalId}`],
-  ["signal-card", `/signals/${signalId}`],
-  ["organization-card", `/organizations/${organizationId}`],
-  ["patterns", "/patterns?sort=importance"],
-  ["pattern-card", `/patterns/${patternId}`],
-  ["decision-journal", "/decision-journal"],
-];
-if (includeFoundation) pages.push(["foundation-v2", "/foundation-preview"]);
+  pages = [
+    ["analytics", "/"],
+    ["analytics-overview", "/overview"],
+    ["signals", "/signals?sort=priority"],
+    ["signal-preview", `/signals?sort=priority&signal=${signalId}`],
+    ["signal-card", `/signals/${signalId}`],
+    ["organization-card", `/organizations/${organizationId}`],
+    ["patterns", "/patterns?sort=importance"],
+    ["pattern-card", `/patterns/${patternId}`],
+    ["decision-journal", "/decision-journal"],
+  ];
+  if (includeFoundation) pages.push(["foundation-v2", "/foundation-preview"]);
+}
 
 mkdirSync(output, { recursive: true });
 const manifest = [];

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "visual:check": "node scripts/capture-visuals.mjs",
-    "visual:foundation": "node scripts/capture-visuals.mjs --foundation"
+    "visual:foundation": "node scripts/capture-visuals.mjs --foundation",
+    "visual:shell": "node scripts/capture-visuals.mjs --shell"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",

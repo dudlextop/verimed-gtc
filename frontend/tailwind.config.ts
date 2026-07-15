@@ -63,7 +63,8 @@ const config: Config = {
         "v2-low-soft": "var(--v2-low-soft)",
         "v2-low-text": "var(--v2-low-text)",
         "v2-info": "var(--v2-info)",
-        "v2-info-soft": "var(--v2-info-soft)"
+        "v2-info-soft": "var(--v2-info-soft)",
+        "v2-overlay": "var(--v2-overlay-scrim)"
       },
       borderRadius: {
         lg: "var(--radius)", md: "var(--radius-sm)", xl: "var(--radius-lg)",
