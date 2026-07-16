@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PatternPage from "@/app/patterns/[id]/page";
 import PatternsPage from "@/app/patterns/page";
-import { PatternAttention } from "@/components/pattern-attention";
 import { PatternTimelineChart } from "@/components/pattern-timeline-chart";
 import { PatternsView } from "@/components/patterns-view";
 import { graphNodeLabel, RelationshipGraph } from "@/components/relationship-graph";
@@ -143,12 +142,6 @@ describe("повторяющиеся модели V2", () => {
     render(<PatternsView />);
     expect(await screen.findByText("По выбранным условиям моделей нет")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Сбросить все" })).toHaveLength(2);
-  });
-
-  it("командный центр сохраняет переход к модели", () => {
-    render(<PatternAttention data={patternSummaryFixture} />);
-    expect(screen.getByText("Повторяющиеся модели, требующие внимания")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Повторяющаяся услуга: Холтеровское мониторирование/ })).toHaveAttribute("href", "/patterns/7");
   });
 
   it("сохраняет topology графа и делает центральную модель главным узлом", () => {

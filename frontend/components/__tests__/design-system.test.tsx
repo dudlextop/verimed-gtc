@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ImportanceBadge, StabilityBadge } from "@/components/pattern-badges";
 import { PriorityBadge } from "@/components/priority-badge";
 import { RiskBadge } from "@/components/risk-badge";
-import { Button, FinancialValue, InlineNotice } from "@/components/ui";
+import { Button, FinancialValue, InlineNotice } from "@/components/foundation";
 
 describe("визуальная семантика Verimed", () => {
   it("разделяет рабочий приоритет, риск, важность и устойчивость", () => {

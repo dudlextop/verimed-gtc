@@ -1,6 +1,6 @@
 import { Layers3 } from "lucide-react";
 import type { RecurringPattern, RiskLevel } from "@/lib/types";
-import { DomainIndicator } from "./ui";
+import { DomainIndicator } from "./foundation";
 
 export function ImportanceBadge({ level }: { level: RiskLevel }) {
   return <DomainIndicator kind="importance" level={level} label={`Важность: ${level}`} />;

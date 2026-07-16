@@ -12,7 +12,7 @@ export function DecisionTimeline({ history, onRefine }: { history: DecisionHisto
 
 export function RecurrenceHistoryCard({ data, kind }: { data: RecurrenceHistory; kind: "signal" | "pattern" }) {
   const firstLabel = kind === "signal" ? "Этот сигнал обнаружен впервые" : "Эта модель обнаружена впервые";
-  if (!data.points.length) return <div className="rounded-lg bg-muted p-5"><p className="font-semibold">{firstLabel}</p><p className="mt-2 text-sm text-muted-foreground">Предыдущая история отсутствует.</p></div>;
+  if (!data.points.length) return <div className="rounded-v2-card bg-v2-surface-soft p-5 text-v2-text"><p className="font-semibold">{firstLabel}</p><p className="mt-2 text-sm text-v2-text-secondary">Предыдущая история отсутствует.</p></div>;
   const current = data.points[data.points.length - 1]; const previous = data.points.length > 1 ? data.points[data.points.length - 2] : null;
   const difference = (value: number | null, old: number | null, label: string) => value === null || old === null ? `${label}: недостаточно данных` : value === old ? `${label}: без изменений` : `${label}: ${value - old > 0 ? "+" : ""}${value - old}`;
   const financialChange = previous && current.financial_significance !== null && previous.financial_significance !== null ? Number(current.financial_significance) - Number(previous.financial_significance) : null;

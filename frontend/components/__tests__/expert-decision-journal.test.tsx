@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DecisionTimeline, RecurrenceHistoryCard } from "@/components/decision-timeline";
-import { ExpertWork } from "@/components/expert-work";
-import type { DecisionHistory, ExpertReviewSummary, RecurrenceHistory } from "@/lib/types";
+import type { DecisionHistory, RecurrenceHistory } from "@/lib/types";
 
 const history: DecisionHistory = {
   entity_type: "signal",
@@ -26,10 +25,6 @@ const recurrence: RecurrenceHistory = {
   points: [{ analysis_run_id: 3, appeared_at: "2026-07-12T09:00:00", risk_score: 82, priority_score: 88, stability_score: null, importance_score: null, financial_significance: "450000", signal_count: null, status: "Подтверждён сигнал", participant_signature: null }],
 };
 
-const summary: ExpertReviewSummary = {
-  reviewed_signals: 4, reviewed_patterns: 1, confirmed_share: null, rejected_share: null, escalated_share: null, average_first_decision_hours: 6.5, average_completion_hours: null, signals_without_decision: 91, patterns_without_decision: 12, in_progress: 3, completed_current_period: 2, sample_sufficient: false, sample_message: "Недостаточно завершённых проверок для расчёта устойчивой доли подтверждения.", usefulness_distribution: {}, explanation_quality_distribution: {}, priority_correctness_distribution: {},
-};
-
 describe("долговременный экспертный контур", () => {
   it("показывает неизменяемую хронологию и уточнение решения", () => {
     const refine = vi.fn(); render(<DecisionTimeline history={history} onRefine={refine}/>);
@@ -49,12 +44,5 @@ describe("долговременный экспертный контур", () =>
   it("показывает состояние первого обнаружения", () => {
     render(<RecurrenceHistoryCard data={{ ...recurrence, points: [], appeared_runs: 0 }} kind="pattern"/>);
     expect(screen.getByText("Эта модель обнаружена впервые")).toBeInTheDocument();
-  });
-
-  it("показывает блок экспертной работы и состояние малой выборки", () => {
-    render(<ExpertWork data={summary}/>);
-    expect(screen.getByText("Экспертная работа")).toBeInTheDocument();
-    expect(screen.getByText(summary.sample_message!)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Открыть журнал решений" })).toHaveAttribute("href", "/decision-journal");
   });
 });

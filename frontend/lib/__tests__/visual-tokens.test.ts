@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -8,6 +8,19 @@ const foundation = ["actions.tsx", "controls.tsx", "data.tsx", "indicators.tsx",
   .join("\n");
 const rootLayout = readFileSync(join(process.cwd(), "app", "layout.tsx"), "utf8");
 const chartTheme = readFileSync(join(process.cwd(), "lib", "chart-theme.ts"), "utf8");
+const presentationSource = ["app", "components", "lib", "test-harness", "tailwind.config.ts"]
+  .flatMap((entry) => readSource(join(process.cwd(), entry)))
+  .join("\n");
+
+function readSource(path: string): string[] {
+  if (!existsSync(path)) return [];
+  if (!path.endsWith(".ts") && !path.endsWith(".tsx") && !path.endsWith(".css") && !path.endsWith(".mjs")) {
+    return readdirSync(path, { withFileTypes: true })
+      .filter((entry) => entry.name !== "__tests__")
+      .flatMap((entry) => readSource(join(path, entry.name)));
+  }
+  return [readFileSync(path, "utf8")];
+}
 
 function luminance(hex: string) {
   const components = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255)
@@ -29,14 +42,14 @@ describe("визуальные токены", () => {
   });
 
   it("сохраняет утверждённые базовые цвета V2", () => {
-    for (const token of ["--v2-canvas: #f7f9fc", "--v2-surface: #ffffff", "--v2-text: #071a42", "--v2-primary: #0f5ef7", "--v2-cyan: #08b9e8", "--v2-teal: #0b8f7a", "--v2-medium: #b78300"]) {
+    for (const token of ["--v2-canvas: #f7f9fc", "--v2-surface: #ffffff", "--v2-text: #071a42", "--v2-text-muted: #62718a", "--v2-primary: #0f5ef7", "--v2-cyan: #08b9e8", "--v2-teal: #0b8f7a", "--v2-medium: #b78300"]) {
       expect(css).toContain(token);
     }
   });
 
   it("использует контрастные foreground-токены не ниже WCAG AA", () => {
     for (const [foreground, background] of [
-      ["#071a42", "#f7f9fc"], ["#506180", "#ffffff"], ["#0f5ef7", "#eaf2ff"],
+      ["#071a42", "#f7f9fc"], ["#506180", "#ffffff"], ["#62718a", "#f2f6fb"], ["#0f5ef7", "#eaf2ff"],
       ["#06718e", "#e9fafe"], ["#087260", "#eaf8f5"], ["#b62b3d", "#fff0f1"],
       ["#b94a12", "#fff4ea"], ["#946900", "#fff8dd"], ["#1a7050", "#ecf8f2"],
     ]) {
@@ -47,6 +60,19 @@ describe("визуальные токены", () => {
   it("не вводит запрещённые presentation-акценты в foundation", () => {
     expect(foundation).not.toMatch(/(?:violet|purple|indigo|shadow-glow|radial-gradient)/i);
     expect(foundation).not.toContain("transition-all");
+  });
+
+  it("не содержит запрещённых и legacy presentation-паттернов в пользовательском UI", () => {
+    expect(presentationSource).not.toMatch(/(?:violet|purple|indigo|shadow-glow|radial-gradient|transition-all|gradient-command|gradient-brand-soft)/i);
+    expect(presentationSource).not.toMatch(/\b(?:surface-panel|surface-flat|interactive-card|filter-field|sticky-workbar|metric-number)\b|(?<!v2-)data-table/);
+    expect(presentationSource).not.toMatch(/\bfont-mono\b/);
+    expect(presentationSource).not.toMatch(/shield-logo/);
+  });
+
+  it("удаляет компоненты, которые больше не используются продуктом", () => {
+    for (const file of ["expert-work.tsx", "pattern-attention.tsx", "quality-metric.tsx", "ui.tsx"]) {
+      expect(existsSync(join(process.cwd(), "components", file))).toBe(false);
+    }
   });
 
   it("подключает Inter через next/font с кириллицей и четырьмя начертаниями", () => {

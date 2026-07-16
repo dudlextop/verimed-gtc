@@ -143,7 +143,7 @@ export function RegionalMonitoringMap({
               aria-checked={layer === option.value}
               tabIndex={layer === option.value ? 0 : -1}
               onClick={() => changeLayer(option.value)}
-              className="min-h-10 min-w-0 rounded-[0.5rem] px-3 text-xs font-semibold text-v2-text-secondary transition-colors duration-100 hover:text-v2-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary aria-checked:bg-v2-surface aria-checked:text-v2-primary aria-checked:shadow-sm motion-reduce:transition-none max-sm:px-1"
+              className="min-h-11 min-w-0 rounded-[0.5rem] px-3 text-xs font-semibold text-v2-text-secondary transition-colors duration-100 hover:text-v2-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary aria-checked:bg-v2-surface aria-checked:text-v2-primary aria-checked:shadow-sm motion-reduce:transition-none max-sm:px-1"
             >
               <span className={option.mobileLabel ? "max-sm:hidden" : undefined}>{option.label}</span>
               {option.mobileLabel && <span className="sm:hidden">{option.mobileLabel}</span>}

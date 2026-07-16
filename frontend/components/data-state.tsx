@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, EmptyState, PageSkeleton } from "./ui";
+import { Button, EmptyState, PageSkeleton } from "./foundation";
 
 export function PageLoading() {
   return <PageSkeleton variant="dashboard" />;

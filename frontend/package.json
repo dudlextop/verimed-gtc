@@ -17,7 +17,8 @@
     "visual:organizations": "node scripts/capture-visuals.mjs --organizations",
     "visual:patterns": "node scripts/capture-visuals.mjs --patterns",
     "visual:analytics": "node scripts/capture-visuals.mjs --analytics",
-    "visual:expert": "node scripts/capture-visuals.mjs --expert"
+    "visual:expert": "node scripts/capture-visuals.mjs --expert",
+    "visual:qa": "node scripts/capture-visuals.mjs --qa"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",

@@ -15,9 +15,16 @@ const organizationsOnly = process.argv.includes("--organizations");
 const patternsOnly = process.argv.includes("--patterns");
 const analyticsOnly = process.argv.includes("--analytics");
 const expertOnly = process.argv.includes("--expert");
+const qaOnly = process.argv.includes("--qa");
 const pageMatch = process.env.VERIMED_VISUAL_MATCH;
 const requestedWidths = process.env.VERIMED_VISUAL_WIDTHS?.split(",").map(Number).filter((value) => Number.isInteger(value) && value > 0);
-const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly || analyticsOnly || expertOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
+const widths = requestedWidths?.length
+  ? requestedWidths
+  : qaOnly
+    ? [1440, 1280, 1024, 768, 375, 320]
+    : shellOnly || organizationsOnly || patternsOnly || analyticsOnly || expertOnly
+      ? [1440, 1280, 768, 375]
+      : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -42,7 +49,38 @@ async function firstId(endpoint) {
 }
 
 let pages;
-if (shellOnly) {
+if (qaOnly) {
+  const [signalId, organizationId, patternId] = await Promise.all([
+    firstId("/signals?sort=priority&page_size=1"),
+    firstId("/organizations?sort=priority&page_size=1"),
+    firstId("/patterns?sort=importance&page_size=1"),
+  ]);
+  pages = [
+    ["qa-home", "/", { readySelector: "[data-testid='analytics-home']" }],
+    ["qa-overview", "/overview", { readySelector: "#overview-content" }],
+    ["qa-signals", "/signals?sort=priority", { readySelector: "[data-testid='signals-mobile-list']" }],
+    ["qa-signal-detail", `/signals/${signalId}`, { readySelector: "nav[aria-label='Этапы проверки']" }],
+    ["qa-organizations", "/organizations?sort=priority", { readySelector: "[data-testid='organizations-mobile-list']" }],
+    ["qa-organization-detail", `/organizations/${organizationId}`, { readySelector: "#summary" }],
+    ["qa-patterns", "/patterns?sort=importance", { readySelector: "[data-testid='patterns-mobile-list']" }],
+    ["qa-pattern-detail", `/patterns/${patternId}`, { readySelector: "#summary" }],
+    ["qa-reviews", "/reviews", { readySelector: "[data-testid='expert-reviews']" }],
+    ["qa-decision-journal", "/decision-journal", { readySelector: "[data-testid='decision-journal']" }],
+    ["qa-methodology", "/methodology", { readySelector: "[data-testid='methodology-page']" }],
+    ["qa-profile", "/profile", { readySelector: "[data-testid='profile-page']" }],
+    ["qa-signal-preview", `/signals?sort=priority&signal=${signalId}`, { readySelector: "[role='dialog'] h2", widths: [1440, 375] }],
+    ["qa-journal-preview", "/decision-journal", { readySelector: "[data-testid='decision-journal']", afterReady: "document.querySelector(\"tbody tr[role='button']\")?.click()", settleMs: 500, widths: [1440, 375] }],
+    ["qa-pattern-graph-selected", `/patterns/${patternId}`, { readySelector: "#graph", afterReady: "document.getElementById('graph')?.scrollIntoView(); setTimeout(() => document.querySelector('[data-graph-node-id]:not([data-node-type=\"pattern\"])')?.click(), 650)", settleMs: 1200, widths: [1440] }],
+    ["qa-overview-priority-layer", "/overview", { readySelector: "[data-testid='regional-monitoring']", afterReady: "Array.from(document.querySelectorAll(\"button[role='radio']\")).find((item) => item.textContent.includes('Приоритет'))?.click()", widths: [1440] }],
+    ["qa-mobile-navigation-open", "/", { readySelector: "[data-testid='analytics-home']", afterReady: "document.querySelector(\"button[aria-label='Открыть навигацию']\")?.click()", settleMs: 400, widths: [768, 375] }],
+    ["qa-zoom-200-home", "/", { readySelector: "[data-testid='analytics-home']", pageScaleFactor: 2, widths: [1440] }],
+    ["qa-zoom-200-signal-detail", `/signals/${signalId}`, { readySelector: "nav[aria-label='Этапы проверки']", pageScaleFactor: 2, widths: [1440] }],
+    ["qa-reduced-motion-overview", "/overview", { readySelector: "#overview-content", reducedMotion: true, widths: [375] }],
+    ["qa-mobile-short-signal", `/signals/${signalId}#decision`, { readySelector: "#decision", afterReady: "document.getElementById('decision')?.scrollIntoView()", height: 568, widths: [375] }],
+    ["qa-mobile-landscape-signals", "/signals?sort=priority", { readySelector: "[data-testid='signals-mobile-list']", height: 375, widths: [768] }],
+    ["qa-overview-print", "/overview", { readySelector: "#overview-content", printMedia: true, printPdf: true, widths: [1440] }],
+  ];
+} else if (shellOnly) {
   pages = [
     ["shell-analytics", "/"],
     ["shell-signals", "/signals?sort=priority"],
@@ -340,15 +378,18 @@ if (shellOnly) {
   ]);
 
   pages = [
-    ["analytics", "/"],
-    ["analytics-overview", "/overview"],
-    ["signals", "/signals?sort=priority"],
-    ["signal-preview", `/signals?sort=priority&signal=${signalId}`],
-    ["signal-card", `/signals/${signalId}`],
-    ["organization-card", `/organizations/${organizationId}`],
-    ["patterns", "/patterns?sort=importance"],
-    ["pattern-card", `/patterns/${patternId}`],
-    ["decision-journal", "/decision-journal"],
+    ["home", "/", { readySelector: "[data-testid='analytics-home']" }],
+    ["overview", "/overview", { readySelector: "#overview-content" }],
+    ["signals", "/signals?sort=priority", { readySelector: "[data-testid='signals-mobile-list']" }],
+    ["signal-detail", `/signals/${signalId}`, { readySelector: "nav[aria-label='Этапы проверки']" }],
+    ["organizations", "/organizations?sort=priority", { readySelector: "[data-testid='organizations-mobile-list']" }],
+    ["organization-detail", `/organizations/${organizationId}`, { readySelector: "#summary" }],
+    ["patterns", "/patterns?sort=importance", { readySelector: "[data-testid='patterns-mobile-list']" }],
+    ["pattern-detail", `/patterns/${patternId}`, { readySelector: "#summary" }],
+    ["reviews", "/reviews", { readySelector: "[data-testid='expert-reviews']" }],
+    ["decision-journal", "/decision-journal", { readySelector: "[data-testid='decision-journal']" }],
+    ["methodology", "/methodology", { readySelector: "[data-testid='methodology-page']" }],
+    ["profile", "/profile", { readySelector: "[data-testid='profile-page']" }],
   ];
   if (includeFoundation) pages.push(["foundation-v2", "/foundation-preview"]);
 }
@@ -366,11 +407,11 @@ for (const width of widths) {
     if (options.widths && !options.widths.includes(width)) continue;
     const file = join(output, `${name}-${width}.png`);
     try {
-      await captureScreenshot(`${baseUrl}${route}`, width, file, options);
+      const result = await captureScreenshot(`${baseUrl}${route}`, width, file, options);
+      manifest.push({ page: name, route, width, file, ...result });
     } catch (error) {
       throw new Error(`Не удалось создать снимок ${name} (${width}px): ${error instanceof Error ? error.message : String(error)}`);
     }
-    manifest.push({ page: name, route, width, file });
   }
 }
 
@@ -447,7 +488,7 @@ async function captureScreenshot(url, width, file, options) {
     }
     const scale = options.pageScaleFactor ?? 1;
     const effectiveWidth = Math.round(width / scale);
-    const effectiveHeight = Math.round(1000 / scale);
+    const effectiveHeight = Math.round((options.height ?? 1000) / scale);
     await client.send("Emulation.setDeviceMetricsOverride", {
       width: effectiveWidth,
       height: effectiveHeight,
@@ -494,6 +535,11 @@ async function captureScreenshot(url, width, file, options) {
     if (runtimeIssues.length > 0) {
       throw new Error(`Ошибки браузерной консоли: ${runtimeIssues.join(" | ")}`);
     }
+    const audit = await accessibilityAudit(client, effectiveWidth);
+    if (audit.issues.length > 0) {
+      throw new Error(`Accessibility audit: ${audit.issues.join(" | ")}`);
+    }
+    const performance = await performanceSummary(client);
     await client.send("Runtime.evaluate", { expression: "document.querySelectorAll('nextjs-portal').forEach((node) => node.remove())" });
     const screenshot = await client.send("Page.captureScreenshot", {
       format: "png",
@@ -509,6 +555,7 @@ async function captureScreenshot(url, width, file, options) {
       });
       writeFileSync(file.replace(/\.png$/, ".pdf"), Buffer.from(pdf.data, "base64"));
     }
+    return { audit, performance };
   } finally {
     socket?.close();
     if (process.exitCode === null) {
@@ -520,6 +567,82 @@ async function captureScreenshot(url, width, file, options) {
     }
     rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
+}
+
+async function accessibilityAudit(client, width) {
+  const result = await client.send("Runtime.evaluate", {
+    expression: `(() => {
+      const visible = (node) => {
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+      };
+      const labelText = (node) => {
+        const labelledBy = node.getAttribute("aria-labelledby");
+        if (labelledBy) return labelledBy.split(/\\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" ").trim();
+        const id = node.getAttribute("id");
+        const label = id ? document.querySelector(\`label[for="\${CSS.escape(id)}"]\`) : node.closest("label");
+        return label?.textContent?.trim() ?? "";
+      };
+      const accessibleName = (node) => (
+        node.getAttribute("aria-label")
+        || labelText(node)
+        || node.getAttribute("alt")
+        || node.getAttribute("title")
+        || node.textContent
+        || ""
+      ).trim();
+      const issues = [];
+      const ids = Array.from(document.querySelectorAll("[id]")).map((node) => node.id).filter(Boolean);
+      const duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+      if (duplicateIds.length) issues.push(\`повторяющиеся id: \${duplicateIds.slice(0, 5).join(", ")}\`);
+      const imagesWithoutAlt = Array.from(document.querySelectorAll("img:not([alt])")).filter(visible);
+      if (imagesWithoutAlt.length) issues.push(\`изображения без alt: \${imagesWithoutAlt.length}\`);
+      const unnamed = Array.from(document.querySelectorAll("button,a[href],input,select,textarea,[role='button'],[role='menuitem'],[role='radio'],[role='checkbox'],[role='tab']"))
+        .filter(visible)
+        .filter((node) => !accessibleName(node));
+      if (unnamed.length) issues.push(\`controls без доступного имени: \${unnamed.slice(0, 5).map((node) => node.tagName).join(", ")}\`);
+      const hiddenFocusable = Array.from(document.querySelectorAll("[aria-hidden='true']"))
+        .filter(visible)
+        .filter((node) => node.matches("button,a[href],input,select,textarea,[tabindex]:not([tabindex='-1'])"));
+      if (hiddenFocusable.length) issues.push(\`aria-hidden focusable controls: \${hiddenFocusable.length}\`);
+      const smallTargets = ${width <= 480} ? Array.from(document.querySelectorAll("button,input:not([type='hidden']),select,textarea,[role='button'],[role='menuitem'],[role='radio'],[role='checkbox']"))
+        .filter(visible)
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          if (rect.width >= 43.5 && rect.height >= 43.5) return false;
+          const label = node.closest("label") || (node.id ? document.querySelector(\`label[for="\${CSS.escape(node.id)}"]\`) : null);
+          const target = label && visible(label) ? label.getBoundingClientRect() : rect;
+          return target.width < 43.5 || target.height < 43.5;
+        }) : [];
+      if (smallTargets.length) issues.push(\`touch targets меньше 44×44: \${smallTargets.slice(0, 5).map((node) => {
+        const rect = node.getBoundingClientRect();
+        return \`\${node.tagName.toLowerCase()} «\${accessibleName(node) || node.tagName}» \${Math.round(rect.width)}×\${Math.round(rect.height)}\`;
+      }).join(", ")}\`);
+      return { issues, checkedControls: document.querySelectorAll("button,a[href],input,select,textarea,[role]").length };
+    })()`,
+    returnByValue: true,
+  });
+  return result.result?.value ?? { issues: ["audit не вернул результат"], checkedControls: 0 };
+}
+
+async function performanceSummary(client) {
+  const result = await client.send("Runtime.evaluate", {
+    expression: `(() => {
+      const navigation = performance.getEntriesByType("navigation")[0];
+      const resources = performance.getEntriesByType("resource");
+      const scripts = resources.filter((entry) => entry.initiatorType === "script");
+      return {
+        domContentLoadedMs: navigation ? Math.round(navigation.domContentLoadedEventEnd) : null,
+        loadMs: navigation ? Math.round(navigation.loadEventEnd) : null,
+        resourceCount: resources.length,
+        scriptTransferBytes: Math.round(scripts.reduce((sum, entry) => sum + (entry.transferSize || 0), 0)),
+        domNodes: document.getElementsByTagName("*").length,
+      };
+    })()`,
+    returnByValue: true,
+  });
+  return result.result?.value ?? null;
 }
 
 function wildcardMatch(value, pattern) {

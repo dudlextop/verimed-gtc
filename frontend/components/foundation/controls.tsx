@@ -43,7 +43,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, React.InputHTMLAttrib
   const controlId = id ?? generatedId;
   const descriptionId = description ? `${controlId}-description` : undefined;
   return (
-    <label htmlFor={controlId} className={cn("inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm text-v2-text", className)}>
+    <label htmlFor={controlId} className={cn("inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm text-v2-text", !label && !description && "min-w-11 justify-center", className)}>
       <span className="relative grid h-5 w-5 shrink-0 place-items-center">
         <input
           ref={ref}
@@ -80,7 +80,7 @@ export function ActiveFilterChip({ filter }: { filter: ActiveFilter }) {
         <button
           type="button"
           onClick={filter.onRemove}
-          className="grid h-8 w-8 place-items-center rounded-v2-control text-v2-text-secondary hover:bg-v2-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary max-sm:h-11 max-sm:w-11"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-v2-control text-v2-text-secondary hover:bg-v2-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary max-sm:h-11 max-sm:w-11"
           aria-label={`Удалить фильтр «${filter.label}»`}
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />

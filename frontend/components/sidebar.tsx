@@ -244,9 +244,7 @@ export function Sidebar() {
 
       {open && (
         <div className="fixed inset-0 z-50 xl:hidden">
-          <button
-            type="button"
-            tabIndex={-1}
+          <div
             className="v2-mobile-navigation-overlay absolute inset-0 bg-v2-overlay backdrop-blur-[2px]"
             onClick={close}
             aria-hidden="true"
