@@ -8,6 +8,7 @@ import {
   unmappedRegionalMonitoring,
 } from "@/lib/region-map";
 import type { RegionalMonitoringItem } from "@/lib/types";
+import { projectKazakhstanGeometry } from "@/lib/kazakhstan-geometry";
 
 const aggregate: RegionalMonitoringItem = {
   region_name: "Алматы",
@@ -47,5 +48,24 @@ describe("сопоставление регионов и геометрии", ()
       const definition = definitions.get(feature.properties.shapeID);
       expect(definition?.displayLabel).toBeTruthy();
     }
+  });
+
+  it("намеренно не назначает Шымкенту геометрию другой области", () => {
+    expect(regionMapDefinition("KZ-SHY")?.geometryFeatureId).toBeNull();
+  });
+
+  it("преобразует Polygon в стабильный SVG path без изменения feature id", () => {
+    const result = projectKazakhstanGeometry({
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        properties: { shapeID: "region-1", shapeName: "Регион" },
+        geometry: { type: "Polygon", coordinates: [[[60, 40], [61, 40], [61, 41], [60, 41], [60, 40]]] },
+      }],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].geometryFeatureId).toBe("region-1");
+    expect(result[0].path).toMatch(/^M/);
+    expect(result[0].path).toContain(" Z");
   });
 });

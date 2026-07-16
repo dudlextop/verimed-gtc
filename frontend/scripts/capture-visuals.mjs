@@ -13,9 +13,10 @@ const shellOnly = process.argv.includes("--shell");
 const reviewFlowOnly = process.argv.includes("--review-flow");
 const organizationsOnly = process.argv.includes("--organizations");
 const patternsOnly = process.argv.includes("--patterns");
+const analyticsOnly = process.argv.includes("--analytics");
 const pageMatch = process.env.VERIMED_VISUAL_MATCH;
 const requestedWidths = process.env.VERIMED_VISUAL_WIDTHS?.split(",").map(Number).filter((value) => Number.isInteger(value) && value > 0);
-const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
+const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly || analyticsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -146,6 +147,54 @@ if (shellOnly) {
     ["pattern-detail-loading", `/patterns/${patternId}`, { readySelector: "[data-skeleton='detail']", settleMs: 0, stallApiPattern: `*127.0.0.1:8000/api/patterns/${patternId}`, widths: [1440, 375] }],
     ["pattern-detail-error", `/patterns/${patternId}`, { readyText: "Не удалось загрузить модель", failApiPattern: `*127.0.0.1:8000/api/patterns/${patternId}`, widths: [1440, 375] }],
   ];
+} else if (analyticsOnly) {
+  const [home, overview] = await Promise.all([
+    fetch(`${apiUrl}/analytics/home`).then((response) => response.json()),
+    fetch(`${apiUrl}/analytics/overview`).then((response) => response.json()),
+  ]);
+  const emptyHome = {
+    ...home,
+    command_center: {
+      ...home.command_center,
+      top_financial_signal: null,
+      priority_organization: null,
+    },
+    pattern_summary: {
+      ...home.pattern_summary,
+      top_importance_pattern: null,
+      attention_patterns: [],
+    },
+    priority_organizations: {
+      ...home.priority_organizations,
+      items: [],
+      total: 0,
+    },
+  };
+  const insufficientTimeline = {
+    ...overview,
+    timeline: overview.timeline?.slice(0, 1) ?? [],
+  };
+  const overviewWithoutTimeline = { ...overview };
+  delete overviewWithoutTimeline.timeline;
+  pages = [
+    ["analytics-home", "/", { readySelector: "[data-testid='analytics-home']" }],
+    ["analytics-home-loading", "/", { readySelector: "[data-skeleton='dashboard']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/analytics/home*", widths: [1440, 375] }],
+    ["analytics-home-empty", "/", { readyText: "Приоритетный сигнал пока не определён", mockApiResponses: [{ pattern: "*127.0.0.1:8000/api/analytics/home*", body: emptyHome }], widths: [1440, 375] }],
+    ["analytics-home-error", "/", { readyText: "Не удалось получить данные", failApiPattern: "*127.0.0.1:8000/api/analytics/home*", widths: [1440, 375] }],
+    ["analytics-overview-signals", "/overview", { readySelector: "[data-testid='regional-monitoring']" }],
+    ["analytics-overview-financial", "/overview", { readySelector: "[data-testid='regional-monitoring']", afterReady: "Array.from(document.querySelectorAll(\"button[role='radio']\")).find((item) => item.textContent.includes('Финансовая'))?.click()", widths: [1440] }],
+    ["analytics-overview-priority", "/overview", { readySelector: "[data-testid='regional-monitoring']", afterReady: "Array.from(document.querySelectorAll(\"button[role='radio']\")).find((item) => item.textContent.includes('Приоритет'))?.click()", widths: [1440] }],
+    ["analytics-overview-selected-region", "/overview", { readySelector: "[data-region-code][data-state='data']", afterReady: "document.querySelector(\"[data-region-code][data-state='data']\")?.closest('a')?.focus()", widths: [1440] }],
+    ["analytics-overview-region-no-data", "/overview", { readySelector: "[data-region-code][data-state='no-data']", afterReady: "document.querySelector(\"[data-region-code][data-state='no-data']\")?.closest('a')?.focus()", widths: [1440] }],
+    ["analytics-overview-mobile-map", "/overview", { readyText: "Показать карту", afterReady: "const summary = Array.from(document.querySelectorAll('summary')).find((item) => item.textContent.includes('Показать карту')); summary?.click(); document.querySelector(\"[data-testid='regional-map-mobile'] svg\")?.scrollIntoView({ block: 'center' })", settleMs: 500, widths: [375] }],
+    ["analytics-overview-timeline-insufficient", "/overview", { readyText: "Недостаточно периодов для динамики", mockApiResponses: [{ pattern: "*127.0.0.1:8000/api/analytics/overview*", body: insufficientTimeline }], afterReady: "Array.from(document.querySelectorAll('p')).find((item) => item.textContent.includes('Недостаточно периодов для динамики'))?.closest('section')?.scrollIntoView()", widths: [1440, 375] }],
+    ["analytics-overview-map-error", "/overview", { readySelector: "[data-testid='regional-monitoring']", failApiPattern: "*127.0.0.1:3000/maps/kazakhstan-adm1.geojson*", afterReady: "const summary = Array.from(document.querySelectorAll('summary')).find((item) => item.textContent.includes('Показать карту')); summary?.click(); document.querySelector(\"[data-testid='regional-map-mobile'] p\")?.closest('div.flex')?.scrollIntoView({ block: 'center' })", settleMs: 500, widths: [1440, 375] }],
+    ["analytics-overview-timeline-error", "/overview", { readyText: "Динамика недоступна", mockApiResponses: [{ pattern: "*127.0.0.1:8000/api/analytics/overview*", body: overviewWithoutTimeline }], afterReady: "Array.from(document.querySelectorAll('p')).find((item) => item.textContent.includes('Динамика недоступна'))?.closest('section')?.scrollIntoView()", widths: [1440, 375] }],
+    ["analytics-overview-print", "/overview", { readySelector: "#overview-content", printMedia: true, printPdf: true, widths: [1440] }],
+    ["analytics-overview-fullscreen", "/overview", { readySelector: "#overview-content", afterReady: "Array.from(document.querySelectorAll('button')).find((item) => item.textContent.includes('Развернуть'))?.click()", settleMs: 500, widths: [1440] }],
+    ["analytics-overview-reduced-motion", "/overview", { readySelector: "#overview-content", reducedMotion: true, widths: [375] }],
+    ["analytics-overview-zoom-200", "/overview", { readySelector: "#overview-content", pageScaleFactor: 2, widths: [1440] }],
+  ];
 } else {
   const [signalId, organizationId, patternId] = await Promise.all([
     firstId("/signals?sort=priority&page_size=1"),
@@ -267,8 +316,11 @@ async function captureScreenshot(url, width, file, options) {
       screenWidth: effectiveWidth,
       screenHeight: effectiveHeight,
     });
-    if (options.reducedMotion) {
-      await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+    if (options.reducedMotion || options.printMedia) {
+      await client.send("Emulation.setEmulatedMedia", {
+        media: options.printMedia ? "print" : "",
+        features: options.reducedMotion ? [{ name: "prefers-reduced-motion", value: "reduce" }] : [],
+      });
     }
     await client.send("Page.navigate", { url });
 
@@ -286,7 +338,18 @@ async function captureScreenshot(url, width, file, options) {
       returnByValue: true,
     });
     if (overflow.result?.value === true) {
-      throw new Error("Обнаружено горизонтальное переполнение документа");
+      const overflowDetails = await client.send("Runtime.evaluate", {
+        expression: `JSON.stringify(Array.from(document.querySelectorAll("*"))
+          .map((node) => {
+            const rect = node.getBoundingClientRect();
+            return { tag: node.tagName, className: String(node.className || "").slice(0, 160), left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width), scrollWidth: node.scrollWidth };
+          })
+          .filter((item) => item.right > document.documentElement.clientWidth + 1 || item.left < -1 || item.scrollWidth > item.width + 1)
+          .sort((left, right) => (right.right - document.documentElement.clientWidth) - (left.right - document.documentElement.clientWidth))
+          .slice(0, 8))`,
+        returnByValue: true,
+      });
+      throw new Error(`Обнаружено горизонтальное переполнение документа: ${overflowDetails.result?.value ?? "элемент не определён"}`);
     }
     if (runtimeIssues.length > 0) {
       throw new Error(`Ошибки браузерной консоли: ${runtimeIssues.join(" | ")}`);
@@ -298,6 +361,14 @@ async function captureScreenshot(url, width, file, options) {
       captureBeyondViewport: false,
     });
     writeFileSync(file, Buffer.from(screenshot.data, "base64"));
+    if (options.printPdf) {
+      const pdf = await client.send("Page.printToPDF", {
+        landscape: true,
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
+      writeFileSync(file.replace(/\.png$/, ".pdf"), Buffer.from(pdf.data, "base64"));
+    }
   } finally {
     socket?.close();
     if (process.exitCode === null) {

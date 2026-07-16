@@ -765,7 +765,7 @@ main a.rounded-lg[href^="/patterns/"] {
 
 @media print {
   @page {
-    size: landscape;
+    size: A4 landscape;
     margin: 10mm;
   }
   html,
@@ -831,5 +831,143 @@ main a.rounded-lg[href^="/patterns/"] {
   .overview-card-arrow,
   [role="tooltip"] {
     display: none !important;
+  }
+}
+
+@layer components {
+  .regional-map {
+    --regional-map-accent: var(--v2-primary);
+  }
+  .regional-map[data-map-layer="financial"] {
+    --regional-map-accent: var(--v2-teal);
+  }
+  .regional-map-region {
+    fill: var(--v2-surface);
+    stroke: var(--v2-border-strong);
+    stroke-width: 1.25;
+    vector-effect: non-scaling-stroke;
+    transition: fill var(--v2-transition-micro) ease-out, stroke var(--v2-transition-micro) ease-out, opacity var(--v2-transition-micro) ease-out;
+  }
+  .regional-map-region[data-state="no-data"] {
+    fill: var(--v2-surface-soft);
+    opacity: 0.78;
+  }
+  .regional-map-region[data-intensity="1"] {
+    fill: color-mix(in srgb, var(--regional-map-accent) 18%, var(--v2-surface));
+  }
+  .regional-map-region[data-intensity="2"] {
+    fill: color-mix(in srgb, var(--regional-map-accent) 32%, var(--v2-surface));
+  }
+  .regional-map-region[data-intensity="3"] {
+    fill: color-mix(in srgb, var(--regional-map-accent) 48%, var(--v2-surface));
+  }
+  .regional-map-region[data-intensity="4"] {
+    fill: color-mix(in srgb, var(--regional-map-accent) 68%, var(--v2-surface));
+  }
+  .regional-map-region[data-intensity="5"] {
+    fill: color-mix(in srgb, var(--regional-map-accent) 88%, var(--v2-surface));
+  }
+  .regional-map-region[data-selected="true"] {
+    stroke: var(--v2-primary-active);
+    stroke-width: 3;
+  }
+  .regional-map a:focus-visible {
+    outline: none;
+  }
+  .regional-map a:focus-visible .regional-map-region {
+    stroke: var(--v2-primary);
+    stroke-width: 4;
+  }
+  @media (hover: hover) {
+    .regional-map a:hover .regional-map-region {
+      stroke: var(--v2-primary);
+      stroke-width: 3;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .regional-map-region {
+    transition: none;
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+  html,
+  body,
+  .overview-main {
+    background: white !important;
+    color: var(--v2-text) !important;
+    overflow: visible !important;
+  }
+  body {
+    background-image: none !important;
+  }
+  #overview-content {
+    display: block !important;
+    max-width: none !important;
+    padding: 6mm 0 0 !important;
+  }
+  #overview-content > * + * {
+    margin-top: 5mm !important;
+  }
+  .overview-print-section,
+  [data-testid="regional-monitoring"] {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+  section[aria-labelledby="overview-attention-title"] > .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .overview-visual-grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr) !important;
+  }
+  .overview-insight-grid-v2 {
+    grid-template-columns: 1.1fr 0.9fr 1fr !important;
+  }
+  [data-testid="regional-monitoring"] > .grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(13rem, 0.6fr) !important;
+  }
+  [data-testid="regional-map-canvas"] {
+    display: block !important;
+    border: 0 !important;
+  }
+  [data-testid="regional-monitoring"] [role="radiogroup"] {
+    display: none !important;
+  }
+  [data-testid="regional-monitoring"] ol a {
+    display: grid !important;
+    grid-template-columns: 1.25rem minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 0.15rem 0.5rem !important;
+  }
+  [data-testid="regional-monitoring"] ol a > strong {
+    grid-column: 2 !important;
+    justify-self: start !important;
+  }
+  [data-testid="regional-monitoring"] ol a > svg {
+    display: none !important;
+  }
+  .regional-map svg {
+    max-height: 250px !important;
+  }
+  [data-testid="regional-map-mobile"],
+  [role="tooltip"],
+  details.print\:hidden {
+    display: none !important;
+  }
+  a {
+    text-decoration: none !important;
+  }
+  a[href]::after {
+    content: none !important;
+  }
+  .regional-map-region {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

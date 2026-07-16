@@ -1,49 +1,194 @@
 "use client";
+
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { Activity, ArrowRight, Building2, CalendarDays, CheckCircle2, ChevronDown, Clock3, Crosshair, Lightbulb, Maximize2, Minus, MoveDownRight, MoveUpRight, ScanSearch } from "lucide-react";
-import type { Metric } from "@/lib/types";
+import { ArrowRight, CheckCircle2, ClipboardCheck, Network, ScanSearch } from "lucide-react";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import { money, number, dateText } from "@/lib/utils";
-import { Card, Badge, Skeleton } from "@/components/ui";
-import { ErrorState, PageLoading } from "@/components/data-state";
-import { PageHeader } from "@/components/page-header";
-import { QualityMetric } from "@/components/quality-metric";
+import { number, percent } from "@/lib/utils";
+import {
+  Badge,
+  DomainIndicator,
+  EmptyState,
+  FinancialValue,
+  MetricCard,
+  MetricStrip,
+  PageHeader,
+  PageSkeleton,
+  SectionHeader,
+} from "@/components/foundation";
+import { ErrorState } from "@/components/data-state";
 import { CommandCenter } from "@/components/command-center";
 import { AnalysisChangesPanel } from "@/components/analysis-changes";
-import { PatternAttention } from "@/components/pattern-attention";
-import { ExpertWork } from "@/components/expert-work";
-import { PriorityBadge } from "@/components/priority-badge";
-
-const RiskDonut = dynamic(() => import("@/components/charts").then(module => module.RiskDonut), {loading: () => <Skeleton className="h-64"/>});
-const TimelineChart = dynamic(() => import("@/components/charts").then(module => module.TimelineChart), {loading: () => <Skeleton className="h-64"/>});
 
 export default function AnalyticsPage() {
   const home = useApi(api.home, []);
-  if (home.loading) return <div className="page-shell"><PageLoading/></div>;
-  if (home.error || !home.data) return <div className="page-shell"><ErrorState message={home.error ?? "Ответ сервиса неполон"} retry={() => void home.retry()}/></div>;
+  if (home.loading) return <div className="page-shell"><PageSkeleton variant="dashboard" /></div>;
+  if (home.error || !home.data) {
+    return <div className="page-shell"><ErrorState message={home.error ?? "Ответ сервиса неполон"} retry={() => void home.retry()} /></div>;
+  }
+
   const data = home.data;
-  const s = data.summary;
-  return <div className="page-shell"><PageHeader eyebrow="Обзор системы" title="Контроль медицинских услуг" description="Verimed анализирует сведения об оказанных медицинских услугах, выявляет нетипичные отклонения и формирует приоритеты для экспертной проверки." action={<div className="flex flex-wrap items-center gap-2"><Badge className="bg-emerald-100 text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden="true"/>{s.analysis.processing_status}</Badge><Link href="/overview" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border-strong bg-card px-3 text-sm font-semibold text-foreground transition-colors duration-100 hover:border-primary/30 hover:bg-surface-tint focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 motion-reduce:transition-none"><Maximize2 className="h-4 w-4 text-primary" aria-hidden="true"/>Открыть аналитический обзор</Link></div>}/>
-    <CommandCenter data={data.command_center}/>
-    <section className="mt-5"><AnalysisChangesPanel data={data.changes}/></section>
-    <section className="mt-5"><Card className="p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Приоритетные медицинские организации</h2><p className="mt-1 text-sm text-muted-foreground">Организации с наибольшим текущим приоритетом проверки.</p></div><Link href="/organizations" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary focus-visible:ring-2 focus-visible:ring-ring">Все организации<ArrowRight className="h-4 w-4" aria-hidden="true"/></Link></div><div className="mt-5 grid gap-3 xl:grid-cols-3">{data.priority_organizations.items.slice(0, 3).map((organization) => <Link key={organization.id} href={`/organizations/${organization.id}`} className="rounded-lg bg-gradient-to-br from-slate-50 to-violet-50 p-4 focus-visible:ring-2 focus-visible:ring-ring"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{organization.name}</p><p className="mt-1 text-xs text-muted-foreground">{organization.region} · {organization.signals_count} сигналов</p></div>{organization.priority_level && <PriorityBadge level={organization.priority_level}/>}</div><div className="mt-4 flex items-baseline justify-between gap-4"><p className="font-mono text-2xl font-bold tabular-nums">{organization.priority_score ?? "—"}<span className="ml-1 text-xs font-normal text-muted-foreground">из 100</span></p><p className="font-mono text-sm font-semibold tabular-nums">{money(organization.financial_significance)}</p></div></Link>)}</div></Card></section>
-    <section className="mt-5"><PatternAttention data={data.pattern_summary}/></section>
-    <details className="group mt-5 rounded-lg bg-card shadow-card"><summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-6 py-4 font-bold focus-visible:ring-2 focus-visible:ring-ring"><span><span className="block">Подробная аналитика</span><span className="mt-1 block text-sm font-normal text-muted-foreground">Показатели качества, динамика и экспертная нагрузка</span></span><ChevronDown className="h-5 w-5 text-primary transition-transform group-open:rotate-180" aria-hidden="true"/></summary><div className="border-t p-5 md:p-6">
-      <ExpertWork data={data.expert_review}/>
-      <section className="mt-5"><Card className="p-6"><div className="flex items-center gap-2 text-sm font-semibold text-primary"><Activity className="h-4 w-4" aria-hidden="true"/>Текущий анализ</div><div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4"><Info icon={CalendarDays} label="Период" value={s.analysis.period}/><Info icon={Building2} label="Организации" value={number(s.analysis.organizations_count)}/><Info icon={ScanSearch} label="Обработано услуг" value={number(s.analysis.records_count)}/><Info icon={Clock3} label="Последний анализ" value={dateText(s.analysis.last_analysis_at)}/></div></Card></section>
-      <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{s.metrics.map(metric => <SummaryMetricCard key={metric.label} metric={metric}/>)}</section>
-      <section className="mt-5"><div className="mb-3 flex items-center gap-2"><Crosshair className="h-5 w-5 text-primary" aria-hidden="true"/><h2 className="text-lg font-bold">Качество анализа</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><QualityMetric label="Точность выявления (Precision)" value={data.quality.precision}/><QualityMetric label="Полнота выявления (Recall)" value={data.quality.recall}/><QualityMetric label="F1-мера" value={data.quality.f1}/><QualityMetric label="Доля услуг, направленных на проверку" value={data.quality.selected_for_review_rate}/></div></section>
-      <section className="mt-5 grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><Card className="p-6"><BlockTitle title="Распределение по уровням риска" subtitle="Количество сформированных сигналов"/><RiskDonut data={data.risk_distribution}/><div className="grid grid-cols-2 gap-2">{data.risk_distribution.map(item => <div key={item.name} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs"><span>{item.name}</span><strong>{number(item.value)}</strong></div>)}</div></Card><Card className="p-6"><BlockTitle title="Динамика объёма медицинских услуг" subtitle="Услуги и сигналы по месяцам"/><TimelineChart data={data.timeline}/></Card></section>
-      <section className="mt-5"><Card className="p-6"><BlockTitle title="Ключевые выводы" subtitle="Наблюдения рассчитаны по данным текущего периода"/><div className="mt-5 grid gap-3 md:grid-cols-2">{data.findings.map(item => <div key={item.title} className="rounded-lg bg-gradient-to-br from-slate-50 to-violet-50 p-4"><div className="flex gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white text-primary shadow-sm"><Lightbulb className="h-4 w-4" aria-hidden="true"/></span><div><p className="font-semibold">{item.title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p></div></div></div>)}</div></Card></section>
-    </div></details>
-  </div>;
+  const analysis = data.summary.analysis;
+  const topSignal = data.command_center.top_financial_signal;
+  const topOrganization = data.command_center.priority_organization ?? data.priority_organizations.items[0] ?? null;
+  const topPattern = data.pattern_summary.top_importance_pattern ?? data.pattern_summary.attention_patterns[0] ?? null;
+
+  return (
+    <div className="page-shell" data-testid="analytics-home">
+      <PageHeader
+        eyebrow="Обзор системы"
+        title="Контроль медицинских услуг"
+        description="Рабочий старт: приоритеты текущего анализа, изменения и объекты для следующей экспертной проверки."
+        meta={(
+          <>
+            <Badge className="border-v2-success/20 bg-v2-success-soft text-v2-success-text">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              {analysis.processing_status}
+            </Badge>
+            <span className="v2-tabular">{analysis.period}</span>
+          </>
+        )}
+      />
+
+      <CommandCenter data={data.command_center} />
+
+      <section className="mt-6" aria-labelledby="home-attention-title">
+        <SectionHeader
+          id="home-attention-title"
+          title="Приоритетные рабочие объекты"
+          description="Один сигнал, одна организация и одна повторяющаяся модель с наибольшей текущей значимостью."
+        />
+        <div className="mt-4 grid gap-4 xl:grid-cols-3" data-testid="home-priority-objects">
+          {topSignal ? (
+            <PriorityObjectLink
+              href={`/signals/${topSignal.id}`}
+              eyebrow="Сигнал"
+              title={topSignal.service_name}
+              context={topSignal.organization_name}
+              indicator={<DomainIndicator kind="priority" level={topSignal.priority_level} value={topSignal.priority_score} />}
+              reason="Наибольшая финансовая значимость среди текущих сигналов."
+              finance={topSignal.financial_significance}
+            />
+          ) : <PriorityObjectEmpty title="Приоритетный сигнал пока не определён" />}
+
+          {topOrganization ? (
+            <PriorityObjectLink
+              href={`/organizations/${topOrganization.id}`}
+              eyebrow="Медицинская организация"
+              title={topOrganization.name}
+              context={"region" in topOrganization ? `${topOrganization.region} · ${number(topOrganization.signals_count)} сигналов` : `${number(topOrganization.high_risk_signals)} сигналов`}
+              indicator={topOrganization.priority_level ? <DomainIndicator kind="priority" level={topOrganization.priority_level} value={topOrganization.priority_score ?? undefined} /> : undefined}
+              reason={"main_reason" in topOrganization ? topOrganization.main_reason : topOrganization.primary_reason}
+              finance={"review_amount" in topOrganization ? topOrganization.review_amount : topOrganization.financial_significance}
+            />
+          ) : <PriorityObjectEmpty title="Приоритетная организация пока не определена" />}
+
+          {topPattern ? (
+            <PriorityObjectLink
+              href={`/patterns/${topPattern.id}`}
+              eyebrow="Повторяющаяся модель"
+              title={topPattern.name}
+              context={topPattern.main_organization ?? topPattern.pattern_type_label}
+              indicator={<DomainIndicator kind="importance" level={topPattern.importance_level} value={topPattern.importance_score} compact />}
+              secondaryIndicator={<DomainIndicator kind="stability" level={topPattern.stability_level} value={topPattern.stability_score} compact />}
+              reason={topPattern.primary_reason}
+              finance={topPattern.financial_significance}
+            />
+          ) : <PriorityObjectEmpty title="Повторяющиеся модели пока не сформированы" />}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <AnalysisChangesPanel data={data.changes} />
+      </section>
+
+      <details className="group mt-6 overflow-hidden rounded-v2-section border border-v2-border bg-v2-surface">
+        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-v2-text hover:bg-v2-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-v2-primary md:px-6">
+          <span>
+            <span className="block">Экспертный контур и качество анализа</span>
+            <span className="mt-1 block text-sm font-normal text-v2-text-secondary">Вторичный контекст без дублирования управленческого обзора.</span>
+          </span>
+          <ArrowRight className="h-4 w-4 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" aria-hidden="true" />
+        </summary>
+        <div className="border-t border-v2-border p-5 md:p-6">
+          <MetricStrip label="Экспертная работа и качество">
+            <MetricCard icon={ClipboardCheck} label="Сигналов без решения" value={number(data.expert_review.signals_without_decision)} />
+            <MetricCard icon={Network} label="Моделей без решения" value={number(data.expert_review.patterns_without_decision)} />
+            <MetricCard icon={CheckCircle2} label="F1-мера" value={percent(data.quality.f1, 2)} />
+            <MetricCard icon={ScanSearch} label="Доля отбора" value={percent(data.quality.selected_for_review_rate, 2)} />
+          </MetricStrip>
+          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+            <div>
+              <p className="text-sm font-bold text-v2-text">Фактические выводы текущего анализа</p>
+              {data.findings.length ? (
+                <ul className="mt-3 grid gap-2 md:grid-cols-2">
+                  {data.findings.slice(0, 4).map((finding) => (
+                    <li key={finding.title} className="rounded-v2-card bg-v2-surface-soft p-4">
+                      <p className="font-semibold text-v2-text">{finding.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-v2-text-secondary">{finding.description}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState className="mt-3 min-h-36" title="Дополнительные выводы пока не сформированы" description="Основные рабочие приоритеты уже доступны выше." />
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/reviews" className="inline-flex min-h-11 items-center gap-2 rounded-v2-control px-3 text-sm font-semibold text-v2-primary hover:bg-v2-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary">
+                Результаты экспертной оценки
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <Link href="/decision-journal" className="inline-flex min-h-11 items-center gap-2 rounded-v2-control px-3 text-sm font-semibold text-v2-primary hover:bg-v2-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary">
+                Журнал решений
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  );
 }
-function Info({ icon: Icon, label, value }: { icon: typeof Activity; label: string; value: string }) { return <div><Icon className="mb-2 h-4 w-4 text-primary" aria-hidden="true"/><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-bold leading-5">{value}</p></div> }
-function BlockTitle({ title, subtitle }: { title: string; subtitle: string }) { return <div><h2 className="text-lg font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{subtitle}</p></div> }
-function SummaryMetricCard({ metric }: { metric: Metric }) {
-  const changeText = metric.trend === "unavailable" ? "Сравнение появится после следующего запуска" : metric.trend === "neutral" ? "Без изменений к предыдущему запуску" : `${metric.change_percent > 0 ? "+" : ""}${metric.change_percent}% к предыдущему запуску`;
-  const changeClass = metric.trend === "up" ? "text-primary" : metric.trend === "down" ? "text-success" : "text-muted-foreground";
-  return <Card className="p-5"><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold leading-5 text-muted-foreground">{metric.label}</p><span className={changeClass}>{metric.trend === "up" ? <MoveUpRight className="h-4 w-4"/> : metric.trend === "down" ? <MoveDownRight className="h-4 w-4"/> : <Minus className="h-4 w-4"/>}</span></div><p className="mt-4 text-2xl font-bold tracking-tight">{metric.label.includes("сумм") || metric.label.includes("Сумма") ? money(metric.value) : number(Number(metric.value))}</p><p className={`mt-2 text-xs font-semibold ${changeClass}`}>{changeText}</p><p className="mt-3 text-xs leading-5 text-muted-foreground">{metric.explanation}</p></Card>;
+
+function PriorityObjectLink({
+  href,
+  eyebrow,
+  title,
+  context,
+  indicator,
+  secondaryIndicator,
+  reason,
+  finance,
+}: {
+  href: string;
+  eyebrow: string;
+  title: string;
+  context: string;
+  indicator?: React.ReactNode;
+  secondaryIndicator?: React.ReactNode;
+  reason: string;
+  finance: string | null;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-56 min-w-0 flex-col rounded-v2-card border border-v2-border bg-v2-surface p-5 transition-[background-color,border-color,box-shadow] duration-100 hover:border-v2-primary hover:bg-v2-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-primary focus-visible:ring-offset-2 motion-reduce:transition-none"
+    >
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.12em] text-v2-text-muted">{eyebrow}</p>
+        {indicator}
+      </div>
+      <h3 className="mt-4 line-clamp-2 text-base font-bold leading-6 text-v2-text">{title}</h3>
+      <p className="mt-1 line-clamp-1 text-sm text-v2-text-secondary">{context}</p>
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-v2-text-secondary">{reason}</p>
+      <div className="mt-auto flex min-w-0 items-end justify-between gap-3 border-t border-v2-border pt-4">
+        <div>{secondaryIndicator}</div>
+        <FinancialValue value={finance ?? "—"} compact />
+      </div>
+    </Link>
+  );
+}
+
+function PriorityObjectEmpty({ title }: { title: string }) {
+  return <EmptyState className="min-h-56" title={title} description="Объект появится после формирования соответствующих результатов анализа." />;
 }
