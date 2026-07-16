@@ -12,8 +12,10 @@ const includeFoundation = process.env.VERIMED_INCLUDE_FOUNDATION === "true" || p
 const shellOnly = process.argv.includes("--shell");
 const reviewFlowOnly = process.argv.includes("--review-flow");
 const organizationsOnly = process.argv.includes("--organizations");
+const patternsOnly = process.argv.includes("--patterns");
 const pageMatch = process.env.VERIMED_VISUAL_MATCH;
-const widths = shellOnly || organizationsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
+const requestedWidths = process.env.VERIMED_VISUAL_WIDTHS?.split(",").map(Number).filter((value) => Number.isInteger(value) && value > 0);
+const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -90,6 +92,59 @@ if (shellOnly) {
     ["organization-empty-patterns", `/organizations/${organizationId}`, { readyText: "Повторяющиеся модели не сформированы", mockApiResponses: [{ pattern: `*127.0.0.1:8000/api/organizations/${organizationId}/patterns`, body: [] }], afterReady: "document.getElementById('patterns')?.scrollIntoView()", widths: [1440, 375] }],
     ["organization-detail-loading", `/organizations/${organizationId}`, { readySelector: "[data-skeleton='detail']", settleMs: 0, stallApiPattern: `*127.0.0.1:8000/api/organizations/${organizationId}`, widths: [1440, 375] }],
     ["organization-detail-error", `/organizations/${organizationId}`, { readyText: "Не удалось загрузить организацию", failApiPattern: `*127.0.0.1:8000/api/organizations/${organizationId}`, widths: [1440, 375] }],
+  ];
+} else if (patternsOnly) {
+  const patternList = await fetch(`${apiUrl}/patterns?sort=importance&page_size=1`).then((response) => response.json());
+  const pattern = patternList.items[0];
+  if (!pattern?.id) throw new Error("В списке нет модели для визуальной проверки.");
+  const patternId = pattern.id;
+  const detail = await fetch(`${apiUrl}/patterns/${patternId}`).then((response) => response.json());
+  const filteredImportance = encodeURIComponent(pattern.importance_level);
+  const filteredType = encodeURIComponent(pattern.pattern_type_label);
+  const emptyDetail = { ...detail, organizations: [], doctors: [], patients: [], services: [] };
+  const insufficientRecurrence = {
+    entity_fingerprint: detail.fingerprint,
+    first_detected_at: detail.first_seen,
+    last_detected_at: detail.last_seen,
+    appeared_runs: 1,
+    absent_runs: 0,
+    last_expert_status: null,
+    points: [{
+      analysis_run_id: 1,
+      appeared_at: detail.last_seen,
+      risk_score: null,
+      priority_score: null,
+      stability_score: detail.stability_score,
+      importance_score: detail.importance_score,
+      financial_significance: detail.financial_significance,
+      signal_count: detail.signal_count,
+      status: "Активна",
+      participant_signature: null,
+    }],
+  };
+  pages = [
+    ["patterns-list", "/patterns?sort=importance", { readySelector: "[data-testid='patterns-mobile-list']" }],
+    ["patterns-list-filtered", `/patterns?importance=${filteredImportance}&pattern_type=${filteredType}&sort=stability`, { readySelector: "[data-testid='patterns-mobile-list']", widths: [1440, 375] }],
+    ["patterns-list-loading", "/patterns?sort=importance", { readySelector: "[data-skeleton='list']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/patterns?*", widths: [1440, 375] }],
+    ["patterns-list-empty", "/patterns?financial_min=999999999999", { readyText: "По выбранным условиям моделей нет", widths: [1440, 375] }],
+    ["patterns-list-error", "/patterns?sort=importance", { readyText: "Не удалось загрузить модели", failApiPattern: "*127.0.0.1:8000/api/patterns?*", widths: [1440, 375] }],
+    ["pattern-summary", `/patterns/${patternId}`, { readySelector: "#summary" }],
+    ["pattern-summary-reduced-motion", `/patterns/${patternId}`, { readySelector: "#summary", reducedMotion: true, widths: [375] }],
+    ["pattern-summary-zoom-200", `/patterns/${patternId}`, { readySelector: "#summary", pageScaleFactor: 2, widths: [1440] }],
+    ["pattern-factors", `/patterns/${patternId}`, { readySelector: "#importance", afterReady: "document.getElementById('importance')?.scrollIntoView()", widths: [1440, 375] }],
+    ["pattern-dynamics", `/patterns/${patternId}`, { readySelector: "#importance", afterReady: "document.getElementById('importance')?.scrollIntoView(); const summary = Array.from(document.querySelectorAll('summary')).find((item) => item.textContent.includes('Динамика важности')); summary?.click(); setTimeout(() => summary?.closest('details')?.scrollIntoView(), 500)", settleMs: 1000, widths: [1440, 375] }],
+    ["pattern-participants", `/patterns/${patternId}`, { readySelector: "#participants", afterReady: "document.getElementById('participants')?.scrollIntoView()", widths: [1440, 375] }],
+    ["pattern-graph", `/patterns/${patternId}`, { readySelector: "#graph", afterReady: "document.getElementById('graph')?.scrollIntoView()", settleMs: 1000, widths: [1440] }],
+    ["pattern-graph-selected", `/patterns/${patternId}`, { readySelector: "#graph", afterReady: "document.getElementById('graph')?.scrollIntoView(); setTimeout(() => document.querySelector('[data-graph-node-id]:not([data-node-type=\"pattern\"])')?.click(), 650)", settleMs: 1200, widths: [1440] }],
+    ["pattern-graph-mobile-list", `/patterns/${patternId}`, { readySelector: "#graph", afterReady: "document.getElementById('graph')?.scrollIntoView()", settleMs: 900, widths: [375] }],
+    ["pattern-signals", `/patterns/${patternId}`, { readySelector: "#incoming-signals", afterReady: "document.getElementById('incoming-signals')?.scrollIntoView()", settleMs: 800, widths: [1440, 375] }],
+    ["pattern-signal-preview", `/patterns/${patternId}`, { readySelector: "#incoming-signals", afterReady: "document.getElementById('incoming-signals')?.scrollIntoView(); setTimeout(() => document.querySelector('#incoming-signals tbody tr')?.click(), 550)", settleMs: 1000, widths: [1440, 375] }],
+    ["pattern-decision", `/patterns/${patternId}`, { readySelector: "#decision", afterReady: "document.getElementById('decision')?.scrollIntoView()", settleMs: 800, widths: [1440, 375] }],
+    ["pattern-insufficient-timeline", `/patterns/${patternId}`, { readySelector: "#importance", mockApiResponses: [{ pattern: `*127.0.0.1:8000/api/patterns/${patternId}/recurrence-history`, body: insufficientRecurrence }], afterReady: "document.getElementById('importance')?.scrollIntoView(); const summary = Array.from(document.querySelectorAll('summary')).find((item) => item.textContent.includes('Динамика важности')); summary?.click(); setTimeout(() => summary?.closest('details')?.scrollIntoView(), 500)", settleMs: 1000, widths: [1440, 375] }],
+    ["pattern-empty-participants", `/patterns/${patternId}`, { readyText: "Участники не сформированы", mockApiResponses: [{ pattern: `*127.0.0.1:8000/api/patterns/${patternId}`, body: emptyDetail }], afterReady: "document.getElementById('participants')?.scrollIntoView()", widths: [1440, 375] }],
+    ["pattern-graph-error", `/patterns/${patternId}`, { readySelector: "#graph", failApiPattern: `*127.0.0.1:8000/api/patterns/${patternId}/graph*`, afterReady: "document.getElementById('graph')?.scrollIntoView()", settleMs: 1000, widths: [1440, 375] }],
+    ["pattern-detail-loading", `/patterns/${patternId}`, { readySelector: "[data-skeleton='detail']", settleMs: 0, stallApiPattern: `*127.0.0.1:8000/api/patterns/${patternId}`, widths: [1440, 375] }],
+    ["pattern-detail-error", `/patterns/${patternId}`, { readyText: "Не удалось загрузить модель", failApiPattern: `*127.0.0.1:8000/api/patterns/${patternId}`, widths: [1440, 375] }],
   ];
 } else {
   const [signalId, organizationId, patternId] = await Promise.all([

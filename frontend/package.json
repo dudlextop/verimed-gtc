@@ -14,7 +14,8 @@
     "visual:foundation": "node scripts/capture-visuals.mjs --foundation",
     "visual:shell": "node scripts/capture-visuals.mjs --shell",
     "visual:review-flow": "node scripts/capture-visuals.mjs --review-flow",
-    "visual:organizations": "node scripts/capture-visuals.mjs --organizations"
+    "visual:organizations": "node scripts/capture-visuals.mjs --organizations",
+    "visual:patterns": "node scripts/capture-visuals.mjs --patterns"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.20.5",
