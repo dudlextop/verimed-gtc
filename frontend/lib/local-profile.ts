@@ -1,5 +1,6 @@
 export const LOCAL_PROFILE_VERSION = 1 as const;
 export const LOCAL_PROFILE_KEY = "verimed:local-profile";
+export const LOCAL_PROFILE_CHANGE_EVENT = "verimed:local-profile-change";
 
 export const NEUTRAL_AVATAR_PRESETS = ["neutral", "blue", "cyan", "teal"] as const;
 export type NeutralAvatarPreset = (typeof NEUTRAL_AVATAR_PRESETS)[number];
@@ -35,6 +36,12 @@ export const SYNTHETIC_PROFILE: Readonly<LocalProfileData> = {
 };
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+function notifyLocalProfileChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(LOCAL_PROFILE_CHANGE_EVENT));
+  }
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -138,6 +145,7 @@ export function saveLocalProfile(
   } catch {
     throw new Error("Не удалось сохранить локальный профиль");
   }
+  notifyLocalProfileChange();
   return envelope;
 }
 
@@ -148,5 +156,19 @@ export function resetLocalProfile(storage?: StorageLike | null): LocalProfileRea
   } catch {
     // Fallback below is intentional when storage is unavailable.
   }
+  notifyLocalProfileChange();
   return { profile: { ...SYNTHETIC_PROFILE }, updatedAt: null, source: "fallback" };
+}
+
+export function localProfileStorageAvailable(storage?: StorageLike | null): boolean {
+  const target = storageOrNull(storage);
+  if (!target) return false;
+  const probeKey = `${LOCAL_PROFILE_KEY}:probe`;
+  try {
+    target.setItem(probeKey, "1");
+    target.removeItem(probeKey);
+    return true;
+  } catch {
+    return false;
+  }
 }

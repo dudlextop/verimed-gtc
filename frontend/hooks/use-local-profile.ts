@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  LOCAL_PROFILE_CHANGE_EVENT,
   LOCAL_PROFILE_KEY,
   readLocalProfile,
   resetLocalProfile,
@@ -18,10 +19,13 @@ export function useLocalProfile() {
     const synchronize = (event: StorageEvent) => {
       if (event.key === LOCAL_PROFILE_KEY || event.key === null) setResult(readLocalProfile());
     };
+    const synchronizeCurrentTab = () => setResult(readLocalProfile());
     window.addEventListener("storage", synchronize);
+    window.addEventListener(LOCAL_PROFILE_CHANGE_EVENT, synchronizeCurrentTab);
     return () => {
       window.cancelAnimationFrame(hydrationFrame);
       window.removeEventListener("storage", synchronize);
+      window.removeEventListener(LOCAL_PROFILE_CHANGE_EVENT, synchronizeCurrentTab);
     };
   }, []);
 

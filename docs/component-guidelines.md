@@ -126,6 +126,20 @@
 - экспертный контур и качество анализа допускается убирать на второй уровень disclosure;
 - переходы к очереди и приоритетной организации сохраняются при визуальной миграции.
 
+## Экспертные страницы V2
+
+- `/reviews` использует одну `MetricStrip` и не более двух фактических визуализаций;
+- при недостаточной выборке графики не рисуются, а одно `EmptyState variant="insufficient"` объясняет ограничение;
+- `/decision-journal` хранит filters/page в URL, использует `FilterBar`, `DataTableShell` и mobile event cards;
+- integrity отображается спокойным `InlineNotice`; hash, fingerprint и технический payload пользователю не показываются;
+- event preview является доступной правой панелью с Escape, focus trap, return focus и блокировкой body scroll;
+- `/methodology` использует линейную четырёхэтапную композицию; API-тексты не заменяются придуманными формулами;
+- юридическое ограничение методики показывается один раз;
+- `/profile` использует только versioned local profile store и не имитирует backend account;
+- форма профиля имеет labels, autocomplete, inline validation, фокус первой ошибки, success/error feedback и вторичный reset;
+- при недоступном localStorage форма сохраняет synthetic fallback и блокирует локальные записи;
+- profile trigger обновляется через общий store, а не отдельное состояние Sidebar.
+
 ## Проверка компонента
 
 Перед слиянием проверяются клавиатура, видимый фокус, контраст, 375/768/1280 px, состояния загрузки/ошибки/пустого результата, отсутствие `transition-all` и работа `prefers-reduced-motion`.

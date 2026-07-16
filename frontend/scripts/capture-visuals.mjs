@@ -14,9 +14,10 @@ const reviewFlowOnly = process.argv.includes("--review-flow");
 const organizationsOnly = process.argv.includes("--organizations");
 const patternsOnly = process.argv.includes("--patterns");
 const analyticsOnly = process.argv.includes("--analytics");
+const expertOnly = process.argv.includes("--expert");
 const pageMatch = process.env.VERIMED_VISUAL_MATCH;
 const requestedWidths = process.env.VERIMED_VISUAL_WIDTHS?.split(",").map(Number).filter((value) => Number.isInteger(value) && value > 0);
-const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly || analyticsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
+const widths = requestedWidths?.length ? requestedWidths : shellOnly || organizationsOnly || patternsOnly || analyticsOnly || expertOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -195,6 +196,142 @@ if (shellOnly) {
     ["analytics-overview-reduced-motion", "/overview", { readySelector: "#overview-content", reducedMotion: true, widths: [375] }],
     ["analytics-overview-zoom-200", "/overview", { readySelector: "#overview-content", pageScaleFactor: 2, widths: [1440] }],
   ];
+} else if (expertOnly) {
+  const reviewSummary = await fetch(`${apiUrl}/analytics/expert-review-summary`).then((response) => response.json());
+  const sufficientReview = {
+    ...reviewSummary,
+    reviewed_signals: 12,
+    reviewed_patterns: 4,
+    confirmed_share: 0.5,
+    rejected_share: 0.25,
+    escalated_share: 0.25,
+    sample_sufficient: true,
+    sample_message: null,
+    usefulness_distribution: { "Полезны": 7, "Частично полезны": 3, "Не помогли": 2 },
+    explanation_quality_distribution: { "Понятные": 8, "Требуют уточнения": 4 },
+    priority_correctness_distribution: { "Корректен": 9, "Требует уточнения": 3 },
+  };
+  const insufficientReview = {
+    ...reviewSummary,
+    reviewed_signals: 0,
+    reviewed_patterns: 0,
+    confirmed_share: null,
+    rejected_share: null,
+    escalated_share: null,
+    sample_sufficient: false,
+    sample_message: "Недостаточно завершённых проверок для устойчивого вывода.",
+    usefulness_distribution: {},
+    explanation_quality_distribution: {},
+    priority_correctness_distribution: {},
+  };
+  const reviewBreakdown = [{ category: "Отклонение стоимости", total: 8, confirmed: 4, rejected: 2, escalated: 2 }];
+  const journalEvent = {
+    id: 4,
+    entity_type: "signal",
+    entity_fingerprint: "f".repeat(64),
+    current_entity_id: 10,
+    object_present: true,
+    analysis_run_id: 3,
+    medical_organization_id: 4,
+    action_type: "Решение по сигналу зафиксировано",
+    decision_status: "Подтверждён сигнал",
+    reason_code: "Доступные сведения подтверждают необходимость дополнительного контроля.",
+    comment: "Сопоставлены доступные документы и контекст медицинской услуги.",
+    reviewer_display_name: "Специалист 01",
+    created_at: "2026-07-13T09:30:00",
+    supersedes_event_id: null,
+    metadata: { object_name: "Компьютерная томография", organization_name: "Центр диагностики «Оңтүстік»" },
+    feedback: null,
+  };
+  const journal = {
+    items: [journalEvent],
+    total: 1,
+    page: 1,
+    page_size: 50,
+    reviewers: ["Специалист 01"],
+    actions: [journalEvent.action_type],
+    decision_statuses: [journalEvent.decision_status],
+    organizations: [{ id: 4, label: "Центр диагностики «Оңтүстік»" }],
+    object_types: [{ value: "price_deviation", label: "Отклонение стоимости" }],
+    analysis_runs: [3],
+  };
+  const integrity = {
+    is_valid: true,
+    checked_events: 1,
+    mismatch_count: 0,
+    details: [],
+    checked_at: "2026-07-13T10:00:00",
+    message: "Целостность истории проверена",
+  };
+  const profileEnvelope = JSON.stringify({
+    version: 1,
+    data: {
+      displayName: "Локальный эксперт",
+      jobTitle: "Специалист контроля",
+      department: "Экспертная работа",
+      contactEmail: "expert@example.local",
+      initials: "ЛЭ",
+      neutralAvatarPreset: "teal",
+    },
+    updatedAt: "2026-07-16T10:00:00.000Z",
+  });
+  const reviewMocks = [
+    { pattern: "*127.0.0.1:8000/api/analytics/expert-review-summary*", body: sufficientReview },
+    { pattern: "*127.0.0.1:8000/api/analytics/expert-review-by-signal-type*", body: reviewBreakdown },
+    { pattern: "*127.0.0.1:8000/api/analytics/expert-review-by-pattern-type*", body: reviewBreakdown },
+  ];
+  const journalMocks = [
+    { pattern: "*127.0.0.1:8000/api/decision-journal?*", body: journal },
+    { pattern: "*127.0.0.1:8000/api/decision-journal/integrity*", body: integrity },
+  ];
+  pages = [
+    ["expert-reviews-sufficient", "/reviews", { readySelector: "[data-testid='expert-reviews']", mockApiResponses: reviewMocks, widths: [1440] }],
+    ["expert-reviews-insufficient", "/reviews", { readyText: "Недостаточно завершённых проверок", mockApiResponses: reviewMocks.map((mock) => mock.pattern.includes("summary") ? { ...mock, body: insufficientReview } : { ...mock, body: [] }) }],
+    ["expert-reviews-reduced-motion", "/reviews", { readyText: "Недостаточно завершённых проверок", mockApiResponses: reviewMocks.map((mock) => mock.pattern.includes("summary") ? { ...mock, body: insufficientReview } : { ...mock, body: [] }), reducedMotion: true, widths: [375] }],
+    ["expert-reviews-zoom-200", "/reviews", { readyText: "Недостаточно завершённых проверок", mockApiResponses: reviewMocks.map((mock) => mock.pattern.includes("summary") ? { ...mock, body: insufficientReview } : { ...mock, body: [] }), pageScaleFactor: 2, widths: [1440] }],
+    ["expert-reviews-loading", "/reviews", { readySelector: "[data-skeleton='dashboard']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/analytics/expert-review-summary*", widths: [1440, 375] }],
+    ["expert-reviews-error", "/reviews", { readyText: "Не удалось загрузить результаты экспертной оценки", failApiPattern: "*127.0.0.1:8000/api/analytics/expert-review-summary*", widths: [1440, 375] }],
+    ["expert-journal", "/decision-journal", { readySelector: "[data-testid='decision-journal']", mockApiResponses: journalMocks }],
+    ["expert-journal-filters", "/decision-journal?entity_type=signal&decision_status=Подтверждён%20сигнал", { readySelector: "[data-testid='decision-journal']", mockApiResponses: journalMocks, widths: [1440] }],
+    ["expert-journal-empty", "/decision-journal", { readyText: "Экспертные решения пока не зафиксированы", mockApiResponses: journalMocks.map((mock) => mock.pattern.includes("integrity") ? mock : { ...mock, body: { ...journal, items: [], total: 0 } }), widths: [1440] }],
+    ["expert-journal-preview", "/decision-journal", { readySelector: "[data-testid='decision-journal']", mockApiResponses: journalMocks, afterReady: "document.querySelector(\"tbody tr[role='button']\")?.click()", settleMs: 500, widths: [1440, 375] }],
+    ["expert-journal-reduced-motion", "/decision-journal", { readySelector: "[data-testid='decision-journal']", mockApiResponses: journalMocks, reducedMotion: true, widths: [375] }],
+    ["expert-journal-zoom-200", "/decision-journal", { readySelector: "[data-testid='decision-journal']", mockApiResponses: journalMocks, pageScaleFactor: 2, widths: [1440] }],
+    ["expert-journal-loading", "/decision-journal", { readySelector: "[data-skeleton='journal']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/decision-journal?*", widths: [1440] }],
+    ["expert-journal-error", "/decision-journal", { readyText: "Не удалось загрузить журнал решений", failApiPattern: "*127.0.0.1:8000/api/decision-journal?*", widths: [1440] }],
+    ["expert-methodology", "/methodology", { readySelector: "[data-testid='methodology-page']" }],
+    ["expert-methodology-disclosure", "/methodology", { readySelector: "[data-testid='methodology-page']", afterReady: "document.querySelector('details summary')?.click()", widths: [1440, 375] }],
+    ["expert-methodology-reduced-motion", "/methodology", { readySelector: "[data-testid='methodology-page']", reducedMotion: true, widths: [375] }],
+    ["expert-methodology-zoom-200", "/methodology", { readySelector: "[data-testid='methodology-page']", pageScaleFactor: 2, widths: [1440] }],
+    ["expert-methodology-loading", "/methodology", { readySelector: "[data-skeleton='detail']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/methodology*", widths: [1440] }],
+    ["expert-methodology-error", "/methodology", { readyText: "Не удалось загрузить методику", failApiPattern: "*127.0.0.1:8000/api/methodology*", widths: [1440] }],
+    ["expert-profile-default", "/profile", { readySelector: "[data-testid='profile-page']" }],
+    ["expert-profile-reduced-motion", "/profile", { readySelector: "[data-testid='profile-page']", reducedMotion: true, widths: [375] }],
+    ["expert-profile-zoom-200", "/profile", { readySelector: "[data-testid='profile-page']", pageScaleFactor: 2, widths: [1440] }],
+    ["expert-profile-validation", "/profile", {
+      readySelector: "[data-testid='profile-page']",
+      afterReady: "const name=document.querySelector(\"input[name='displayName']\"); const email=document.querySelector(\"input[name='contactEmail']\"); const initials=document.querySelector(\"input[name='initials']\"); const set=(node,value)=>{const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; setter.call(node,value); node.dispatchEvent(new Event('input',{bubbles:true}));}; set(name,' '); set(email,'ошибка'); set(initials,'А1'); document.querySelector(\"button[type='submit']\")?.click()",
+      settleMs: 500,
+      widths: [1440],
+    }],
+    ["expert-profile-saved", "/profile", {
+      readyText: "Локальный эксперт",
+      initScript: `localStorage.setItem("verimed:local-profile", ${JSON.stringify(profileEnvelope)});`,
+      widths: [1440, 375],
+    }],
+    ["expert-profile-reset", "/profile", {
+      readySelector: "[data-testid='profile-page']",
+      initScript: `localStorage.setItem("verimed:local-profile", ${JSON.stringify(profileEnvelope)});`,
+      afterReady: "Array.from(document.querySelectorAll('button')).find((item) => item.textContent.includes('Сбросить локальные изменения'))?.click()",
+      settleMs: 500,
+      widths: [1440],
+    }],
+    ["expert-profile-storage-unavailable", "/profile", {
+      readyText: "Локальное сохранение недоступно",
+      initScript: "Storage.prototype.getItem=function(){throw new Error('blocked')}; Storage.prototype.setItem=function(){throw new Error('blocked')}; Storage.prototype.removeItem=function(){throw new Error('blocked')};",
+      widths: [1440, 375],
+    }],
+  ];
 } else {
   const [signalId, organizationId, patternId] = await Promise.all([
     firstId("/signals?sort=priority&page_size=1"),
@@ -305,6 +442,9 @@ async function captureScreenshot(url, width, file, options) {
 
     await client.send("Page.enable");
     await client.send("Runtime.enable");
+    if (options.initScript) {
+      await client.send("Page.addScriptToEvaluateOnNewDocument", { source: options.initScript });
+    }
     const scale = options.pageScaleFactor ?? 1;
     const effectiveWidth = Math.round(width / scale);
     const effectiveHeight = Math.round(1000 / scale);

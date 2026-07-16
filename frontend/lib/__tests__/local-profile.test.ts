@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  LOCAL_PROFILE_CHANGE_EVENT,
   LOCAL_PROFILE_KEY,
   LOCAL_PROFILE_VERSION,
   readLocalProfile,
@@ -57,5 +58,14 @@ describe("локальный профиль", () => {
     expect(readLocalProfile(unavailable).source).toBe("fallback");
     expect(() => saveLocalProfile({ displayName: "Эксперт" }, unavailable)).toThrow("Не удалось сохранить");
     expect(resetLocalProfile(unavailable).source).toBe("fallback");
+  });
+
+  it("уведомляет компоненты текущей вкладки после save и reset", () => {
+    const listener = vi.fn();
+    window.addEventListener(LOCAL_PROFILE_CHANGE_EVENT, listener);
+    saveLocalProfile({ displayName: "Эксперт Verimed" });
+    resetLocalProfile();
+    expect(listener).toHaveBeenCalledTimes(2);
+    window.removeEventListener(LOCAL_PROFILE_CHANGE_EVENT, listener);
   });
 });
