@@ -10,6 +10,7 @@ export function BrandLogo({ className, size = "default", priority = false }: { c
       src="/brand/verimed-logo@2x.png"
       width={436}
       height={112}
+      unoptimized
       priority={priority}
       alt="Verimed"
       className={cn("h-auto object-contain object-left", size === "small" && "w-[136px]", size === "default" && "w-[172px]", size === "large" && "w-[218px]", className)}
