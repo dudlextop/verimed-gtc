@@ -92,6 +92,7 @@ export function ActiveFilterChip({ filter }: { filter: ActiveFilter }) {
 
 export interface FilterBarProps {
   primary: React.ReactNode;
+  primaryClassName?: string;
   advanced?: React.ReactNode;
   activeFilters?: ActiveFilter[];
   activeCount?: number;
@@ -100,15 +101,15 @@ export interface FilterBarProps {
   className?: string;
 }
 
-export function FilterBar({ primary, advanced, activeFilters = [], activeCount, onResetAll, defaultAdvancedOpen = false, className }: FilterBarProps) {
+export function FilterBar({ primary, primaryClassName, advanced, activeFilters = [], activeCount, onResetAll, defaultAdvancedOpen = false, className }: FilterBarProps) {
   const [advancedOpen, setAdvancedOpen] = React.useState(defaultAdvancedOpen);
   const advancedId = React.useId();
   const count = activeCount ?? activeFilters.length;
 
   return (
     <section aria-label="Фильтры" className={cn("rounded-v2-section border border-v2-border bg-v2-surface p-4", className)}>
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">{primary}</div>
+      <div className="flex min-w-0 flex-col gap-3 min-[1360px]:flex-row min-[1360px]:items-end min-[1360px]:justify-between">
+        <div className={cn("grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4", primaryClassName)}>{primary}</div>
         <div className="flex flex-wrap items-center gap-2">
           {advanced && (
             <Button

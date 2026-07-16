@@ -29,7 +29,7 @@ describe("финансовая значимость и приоритет", () =
 
   it("показывает сравнение и ограничение малой группы", () => {
     render(<OrganizationComparisonBlock data={comparison}/>);
-    expect(screen.getByText("Сравнение с сопоставимыми организациями")).toBeInTheDocument();
+    expect(screen.getByText("Сравнение с сопоставимой группой")).toBeInTheDocument();
     expect(screen.getByText(/Критерии группы расширены/)).toBeInTheDocument();
     expect(screen.getByText("Доля повторных услуг")).toBeInTheDocument();
   });
@@ -42,7 +42,7 @@ describe("финансовая значимость и приоритет", () =
     ];
     render(<PrioritySparkline history={history}/>);
     expect(screen.getByLabelText(/Динамика приоритета/)).toBeInTheDocument();
-    expect(screen.getByText("вырос")).toBeInTheDocument();
+    expect(screen.getAllByText(/показатель вырос/).length).toBeGreaterThan(0);
   });
 
   it("объясняет отсутствие истории", () => {

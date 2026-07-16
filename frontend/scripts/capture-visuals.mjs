@@ -11,7 +11,9 @@ const output = process.env.VERIMED_VISUAL_OUTPUT ?? join(tmpdir(), "verimed-visu
 const includeFoundation = process.env.VERIMED_INCLUDE_FOUNDATION === "true" || process.argv.includes("--foundation");
 const shellOnly = process.argv.includes("--shell");
 const reviewFlowOnly = process.argv.includes("--review-flow");
-const widths = shellOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
+const organizationsOnly = process.argv.includes("--organizations");
+const pageMatch = process.env.VERIMED_VISUAL_MATCH;
+const widths = shellOnly || organizationsOnly ? [1440, 1280, 768, 375] : [1440, 768, 375];
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -64,6 +66,31 @@ if (shellOnly) {
     ["review-signal-related", `/signals/${signalId}#related`, { readySelector: "nav[aria-label='Этапы проверки']" }],
     ["review-signal-decision", `/signals/${signalId}#decision`, { readySelector: "nav[aria-label='Этапы проверки']" }],
   ];
+} else if (organizationsOnly) {
+  const organizationId = await firstId("/organizations?sort=priority&page_size=1");
+  const organization = await fetch(`${apiUrl}/organizations/${organizationId}`).then((response) => response.json());
+  const encodedRegion = encodeURIComponent(organization.region);
+  const longName = `${organization.name} — многопрофильный консультативно-диагностический центр регионального значения`;
+  pages = [
+    ["organizations-list", "/organizations?sort=priority", { readySelector: "[data-testid='organizations-mobile-list']" }],
+    ["organizations-list-filtered", `/organizations?region=${encodedRegion}&risk_level=${encodeURIComponent("Критический")}&sort=financial&direction=desc`, { readySelector: "[data-testid='organizations-mobile-list']", widths: [1440, 375] }],
+    ["organizations-list-loading", "/organizations?sort=priority", { readySelector: "[data-skeleton='list']", settleMs: 0, stallApiPattern: "*127.0.0.1:8000/api/organizations?*", widths: [1440, 375] }],
+    ["organizations-list-empty", "/organizations?search=visual-no-matches", { readyText: "По выбранным условиям организаций нет", widths: [1440, 375] }],
+    ["organizations-list-error", "/organizations?sort=priority", { readyText: "Не удалось загрузить организации", failApiPattern: "*127.0.0.1:8000/api/organizations?*", widths: [1440, 375] }],
+    ["organizations-export-loading", "/organizations?sort=priority", { readySelector: "[data-testid='organizations-mobile-list']", afterReady: "Array.from(document.querySelectorAll('button')).find((item) => item.textContent.includes('Экспортировать') && item.getBoundingClientRect().width > 0)?.click()", stallApiPattern: "*127.0.0.1:8000/api/exports/organizations.csv*", widths: [1440] }],
+    ["organizations-export-error", "/organizations?sort=priority", { readySelector: "[data-testid='organizations-mobile-list']", afterReady: "Array.from(document.querySelectorAll('button')).find((item) => item.textContent.includes('Экспортировать') && item.getBoundingClientRect().width > 0)?.click()", failApiPattern: "*127.0.0.1:8000/api/exports/organizations.csv*", widths: [1440] }],
+    ["organization-summary", `/organizations/${organizationId}`, { readySelector: "#summary" }],
+    ["organization-summary-reduced-motion", `/organizations/${organizationId}`, { readySelector: "#summary", reducedMotion: true, widths: [375] }],
+    ["organization-summary-zoom-200", `/organizations/${organizationId}`, { readySelector: "#summary", pageScaleFactor: 2, widths: [1440] }],
+    ["organization-comparison", `/organizations/${organizationId}`, { readySelector: "#comparison", afterReady: "document.getElementById('comparison')?.scrollIntoView()", widths: [1440, 375] }],
+    ["organization-signals", `/organizations/${organizationId}`, { readySelector: "#signals", afterReady: "document.getElementById('signals')?.scrollIntoView()", widths: [1440, 375] }],
+    ["organization-patterns", `/organizations/${organizationId}`, { readySelector: "#patterns", afterReady: "document.getElementById('patterns')?.scrollIntoView()", widths: [1440, 375] }],
+    ["organization-long-name", `/organizations/${organizationId}`, { readySelector: "h1", afterReady: `document.querySelector("h1").textContent = ${JSON.stringify(longName)}`, widths: [1440, 375] }],
+    ["organization-empty-signals", `/organizations/${organizationId}`, { readyText: "Сигналы не сформированы", mockApiResponses: [{ pattern: `*127.0.0.1:8000/api/organizations/${organizationId}`, body: { ...organization, recent_signals: [] } }], afterReady: "document.getElementById('signals')?.scrollIntoView()", widths: [1440, 375] }],
+    ["organization-empty-patterns", `/organizations/${organizationId}`, { readyText: "Повторяющиеся модели не сформированы", mockApiResponses: [{ pattern: `*127.0.0.1:8000/api/organizations/${organizationId}/patterns`, body: [] }], afterReady: "document.getElementById('patterns')?.scrollIntoView()", widths: [1440, 375] }],
+    ["organization-detail-loading", `/organizations/${organizationId}`, { readySelector: "[data-skeleton='detail']", settleMs: 0, stallApiPattern: `*127.0.0.1:8000/api/organizations/${organizationId}`, widths: [1440, 375] }],
+    ["organization-detail-error", `/organizations/${organizationId}`, { readyText: "Не удалось загрузить организацию", failApiPattern: `*127.0.0.1:8000/api/organizations/${organizationId}`, widths: [1440, 375] }],
+  ];
 } else {
   const [signalId, organizationId, patternId] = await Promise.all([
     firstId("/signals?sort=priority&page_size=1"),
@@ -84,6 +111,7 @@ if (shellOnly) {
   ];
   if (includeFoundation) pages.push(["foundation-v2", "/foundation-preview"]);
 }
+if (pageMatch) pages = pages.filter(([name]) => name.includes(pageMatch));
 
 mkdirSync(output, { recursive: true });
 const manifest = [];
@@ -94,8 +122,13 @@ for (const [, route] of pages) {
 }
 for (const width of widths) {
   for (const [name, route, options = {}] of pages) {
+    if (options.widths && !options.widths.includes(width)) continue;
     const file = join(output, `${name}-${width}.png`);
-    await captureScreenshot(`${baseUrl}${route}`, width, file, options);
+    try {
+      await captureScreenshot(`${baseUrl}${route}`, width, file, options);
+    } catch (error) {
+      throw new Error(`Не удалось создать снимок ${name} (${width}px): ${error instanceof Error ? error.message : String(error)}`);
+    }
     manifest.push({ page: name, route, width, file });
   }
 }
@@ -126,25 +159,58 @@ async function captureScreenshot(url, width, file, options) {
     socket = new WebSocket(pageTarget.webSocketDebuggerUrl);
     await once(socket, "open");
     const client = createCdpClient(socket);
+    const runtimeIssues = [];
+    client.onEvent = (message) => {
+      if (message.method === "Runtime.exceptionThrown") {
+        runtimeIssues.push(message.params.exceptionDetails?.text ?? "Необработанное исключение");
+      }
+      if (message.method === "Runtime.consoleAPICalled" && message.params.type === "error") {
+        runtimeIssues.push(message.params.args?.map((argument) => argument.value ?? argument.description ?? "").join(" ") || "Ошибка браузерной консоли");
+      }
+    };
 
-    if (options.failApi || options.failApiPattern) {
+    if (options.failApi || options.failApiPattern || options.stallApiPattern || options.mockApiResponses) {
+      const runtimeHandler = client.onEvent;
       client.onEvent = (message) => {
+        runtimeHandler(message);
         if (message.method === "Fetch.requestPaused") {
-          void client.send("Fetch.failRequest", { requestId: message.params.requestId, errorReason: "Failed" });
+          const mock = options.mockApiResponses?.find((entry) => wildcardMatch(message.params.request.url, entry.pattern));
+          if (mock) {
+            const isPreflight = message.params.request.method === "OPTIONS";
+            void client.send("Fetch.fulfillRequest", {
+              requestId: message.params.requestId,
+              responseCode: isPreflight ? 204 : 200,
+              responseHeaders: [
+                { name: "content-type", value: "application/json; charset=utf-8" },
+                { name: "access-control-allow-origin", value: "*" },
+                { name: "access-control-allow-methods", value: "GET, POST, OPTIONS" },
+                { name: "access-control-allow-headers", value: "content-type" },
+              ],
+              body: isPreflight ? undefined : Buffer.from(JSON.stringify(mock.body)).toString("base64"),
+            });
+          } else if (options.stallApiPattern) {
+            return;
+          } else {
+            void client.send("Fetch.failRequest", { requestId: message.params.requestId, errorReason: "Failed" });
+          }
         }
       };
-      await client.send("Fetch.enable", { patterns: [{ urlPattern: options.failApiPattern ?? "*127.0.0.1:8000/api/signals*", requestStage: "Request" }] });
+      const patterns = options.mockApiResponses?.map((entry) => ({ urlPattern: entry.pattern, requestStage: "Request" })) ?? [{ urlPattern: options.failApiPattern ?? options.stallApiPattern ?? "*127.0.0.1:8000/api/signals*", requestStage: "Request" }];
+      await client.send("Fetch.enable", { patterns });
     }
 
     await client.send("Page.enable");
     await client.send("Runtime.enable");
+    const scale = options.pageScaleFactor ?? 1;
+    const effectiveWidth = Math.round(width / scale);
+    const effectiveHeight = Math.round(1000 / scale);
     await client.send("Emulation.setDeviceMetricsOverride", {
-      width,
-      height: 1000,
-      deviceScaleFactor: 1,
-      mobile: width < 768,
-      screenWidth: width,
-      screenHeight: 1000,
+      width: effectiveWidth,
+      height: effectiveHeight,
+      deviceScaleFactor: scale,
+      mobile: effectiveWidth < 768,
+      screenWidth: effectiveWidth,
+      screenHeight: effectiveHeight,
     });
     if (options.reducedMotion) {
       await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
@@ -160,6 +226,16 @@ async function captureScreenshot(url, width, file, options) {
       await client.send("Runtime.evaluate", { expression: options.afterReady });
     }
     await new Promise((resolve) => setTimeout(resolve, options.settleMs ?? 250));
+    const overflow = await client.send("Runtime.evaluate", {
+      expression: "document.documentElement.scrollWidth > document.documentElement.clientWidth + 1",
+      returnByValue: true,
+    });
+    if (overflow.result?.value === true) {
+      throw new Error("Обнаружено горизонтальное переполнение документа");
+    }
+    if (runtimeIssues.length > 0) {
+      throw new Error(`Ошибки браузерной консоли: ${runtimeIssues.join(" | ")}`);
+    }
     await client.send("Runtime.evaluate", { expression: "document.querySelectorAll('nextjs-portal').forEach((node) => node.remove())" });
     const screenshot = await client.send("Page.captureScreenshot", {
       format: "png",
@@ -178,6 +254,11 @@ async function captureScreenshot(url, width, file, options) {
     }
     rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
+}
+
+function wildcardMatch(value, pattern) {
+  const expression = pattern.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp(`^${expression}$`).test(value);
 }
 
 function debugSocketUrl(process) {
@@ -233,5 +314,9 @@ async function waitForExpression(client, expression, timeoutMs = 12_000) {
     if (result.result?.value === true) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`Страница не достигла ожидаемого состояния: ${expression}`);
+  const diagnostic = await client.send("Runtime.evaluate", {
+    expression: "document.body?.innerText.slice(0, 800) ?? ''",
+    returnByValue: true,
+  });
+  throw new Error(`Страница не достигла ожидаемого состояния: ${expression}. Видимый текст: ${diagnostic.result?.value ?? "недоступен"}`);
 }

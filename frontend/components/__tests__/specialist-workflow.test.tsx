@@ -34,7 +34,7 @@ describe("сквозной сценарий специалиста", () => {
     command.unmount();
 
     const comparison = render(<OrganizationComparisonBlock data={{organization_id: 4, analysis_run_id: 3, peer_group_size: 4, reliability: "Средняя", limitation: "Группа расширена.", items: [{metric_key: "signal_services_amount", metric_label: "Сумма услуг, связанных с сигналами", value: 12400000, peer_median: 4500000, typical_low: 3200000, typical_high: 6100000, deviation_percent: 175.6, position: 1, peer_group_size: 4, reliability: "Средняя", limitation: "Группа расширена.", explanation: "Показатель выше медианы группы."}]}}/>);
-    expect(screen.getByText("Сравнение с сопоставимыми организациями")).toBeInTheDocument();
+    expect(screen.getByText("Сравнение с сопоставимой группой")).toBeInTheDocument();
     comparison.unmount();
 
     const preview = render(<SignalPreviewPanel signalId={10} onClose={vi.fn()} onUpdated={vi.fn()}/>);
